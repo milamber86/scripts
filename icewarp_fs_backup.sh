@@ -9,6 +9,7 @@
 unset PATH	# suggestion from H. Milz: avoid accidental use of $PATH
 
 # ------------- system commands used by this script --------------------
+
 ID=/usr/bin/id;
 ECHO=/bin/echo;
 
@@ -19,15 +20,13 @@ CP=/bin/cp;
 TOUCH=/bin/touch;
 RSYNC=/usr/bin/rsync;
 
-
 # ------------- file locations and vars --------------------------------
 
-MOUNT_DEVICE=/dev/mapper/cl-backup;
 # Backup target
-SNAPSHOT_RW=/data/backup;
-# EXCLUDES=/usr/local/etc/backup_exclude;
+SNAPSHOT_RW="/opt/icewarp/backup/mail"
+mkdir -p ${SNAPSHOT_RW}
 # Backup source
-DATAPATH=/data/icewarp;
+DATAPATH=/opt/icewarp/mail;
 # How many versions of backups to keep
 BCOUNT=7;
 
@@ -35,16 +34,6 @@ BCOUNT=7;
 
 # make sure we're running as root
 if (( `$ID -u` != 0 )); then { $ECHO "Sorry, must be root.  Exiting..."; exit; } fi
-
-# attempt to remount the RW mount point as RW; else abort
-#$MOUNT -o remount,rw $MOUNT_DEVICE $SNAPSHOT_RW ;
-#if (( $? )); then
-#{
-#	$ECHO "snapshot: could not remount $SNAPSHOT_RW readwrite";
-#	exit;
-#}
-#fi;
-
 
 # rotating snapshots of $DATAPATH
 
@@ -73,23 +62,9 @@ fi;
 # is unlinked first.  If it were not so, this would copy over the other
 # snapshot(s) too!
 $RSYNC -va --delete ${DATAPATH}/ ${SNAPSHOT_RW}/daily.0/ ;
-# --delete-excluded --exclude-from="$EXCLUDES"			
 
 # step 5: update the mtime of hourly.0 to reflect the snapshot time
 $TOUCH $SNAPSHOT_RW/daily.0 ;
 
 # and thats it for $DATAPATH.
-
-# now remount the RW snapshot mountpoint as readonly
-#
-#$MOUNT -o remount,ro $MOUNT_DEVICE $SNAPSHOT_RW ;
-#if (( $? )); then
-#{
-#	$ECHO "snapshot: could not remount $SNAPSHOT_RW readonly";
-#	exit;
-#} fi;
-
-# mail backup completed
-/usr/sbin/ssmtp admin@mukrupka.cz < /root/mail_tpl_fs_ok.imap
 exit 0;
-
