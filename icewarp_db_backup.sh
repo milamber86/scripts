@@ -2,7 +2,6 @@
 #-------------------------------------------
 # IceWarp cfg and db backup script for cloud
 # beranek@icewarp.cz
-
 #---------------init vars-------------------
 ID=/usr/bin/id;
 ECHO=/bin/echo;
@@ -13,11 +12,10 @@ dbhost=127.0.0.1;
 db1=accounts;
 db2=antispam;
 db3=groupware;
-
 #---------------do backup-------------------
 # make sure we're running as root
 if (( `$ID -u` != 0 )); then { $ECHO "Sorry, must be root.  Exiting..."; exit; } fi
-
+#
 mkdir -p ${backuppath}
 mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} ${db1} | gzip -c | cat > ${backuppath}/bck_${db1}`date +%Y%m%d-%H%M`.sql.gz
 mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} ${db2} | gzip -c | cat > ${backuppath}/bck_${db2}`date +%Y%m%d-%H%M`.sql.gz
