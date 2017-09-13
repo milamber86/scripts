@@ -65,12 +65,12 @@ ${icewarp_path}/icewarpd.sh --restart "${1}";
 dump_service()
 {
 local filename="`date "+%y-%m-%d_%H:%M:%S"`-${1}.core";
-gcore -o "${debugdir}/${filename}" $(cat /opt/icewarp/var/${1}.pid)
+gcore -o "${debugdir}/${filename}" $(cat ${icewarp_dir}/var/${1}.pid)
 if [ -f "${debugdir}/${filename}" ]; then
-	echo "[$(date)] ${debugdir}/${filename}" >> ${fail_logfile} 2>&1	
+	echo "[$(date)] ${debugdir}/${filename}" >> ${fail_logfile}
 	return "${debugdir}/${filename}";
 		else
-	echo "[$(date)] dump of ${1} failed" >> ${fail_logfile} 2>&1	
+	echo "[$(date)] dump of ${1} failed" >> ${fail_logfile}
 	return "dump of ${1} failed";
 		fi
 }
@@ -80,10 +80,10 @@ dowedump()
 {
 declare -i hour=$(date +%H);
 if (( 8 > 10#${hour} && 10#${hour} > 20 )); then
-	echo "[$(date)] not between 8-20, we can dump .." >> ${fail_logfile} 2>&1	
+	echo "[$(date)] not between 8-20, we can dump .." >> ${fail_logfile}	
 	return 1
 		else
-	echo "[$(date)] between 8-20, we cannot dump .." >> ${fail_logfile} 2>&1
+	echo "[$(date)] between 8-20, we cannot dump .." >> ${fail_logfile}
 	return 0
 }
 # check for duplicate process running, if so, exit with error.
@@ -91,7 +91,7 @@ dowerun()
 {
 for pid in $(pgrep -f icewarp_watchdog.sh); do
     if [ ${pid} != $$ ]; then
-        echo "[$(date)] : icewarp_watchdog.sh : Process is already running with PID ${pid}, exiting 1." >> ${ok_logfile} 2>&1
+        echo "[$(date)] Process is already running with PID ${pid}, exiting 1." >> ${ok_logfile}
         exit 1
     fi
 done
@@ -111,11 +111,11 @@ if [ "${response}" == "200" ]; then
 				dump_service "control";
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, dump done, control restarted" >> ${fail_logfile} 2>&1
+				echo "[$(date)] php killed, dump done, control restarted" >> ${fail_logfile}
 					else
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, control restarted" >> ${fail_logfile} 2>&1
+				echo "[$(date)] php killed, control restarted" >> ${fail_logfile}
 			fi	
 fi
 sleep 1;
@@ -127,8 +127,8 @@ if [ "${response}" == "200" ]; then
 		else
 	kill_php;
 	rm -fv ${icewarp_path}/php/tmp/sess_* >> ${fail_logfile} 2>&1		
-	restart_service "control";
-	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile} 2>&1	
+	restart_service "control" >> ${fail_logfile} 2>&1
+	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile}
 fi
 #
 # todo : mount nfs, pack dumps and logs there, umount nfs
