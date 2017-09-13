@@ -131,5 +131,6 @@ if [ "${response}" == "200" ]; then
 	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile} 2>&1	
 fi
 #
-# todo : mount nfs, pack dumps and logs there, umount nfs		
+# todo : mount nfs, pack dumps and logs there, umount nfs
+# todo : report to mail/zabbix
 exit 0
