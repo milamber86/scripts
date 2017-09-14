@@ -36,7 +36,7 @@ http_check()
 {
 local https_response="null";
 https_response=$(curl -s -k -o /dev/null -w "%{http_code}" -m 10 https://127.0.0.1/webmail/);
-return "${https_response}";
+echo "${https_response}";
 }
 #
 # kill all php workers
@@ -65,12 +65,12 @@ ${icewarp_path}/icewarpd.sh --restart "${1}";
 dump_service()
 {
 local filename="`date "+%y-%m-%d_%H:%M:%S"`-${1}.core";
-gcore -o "${debugdir}/${filename}" $(cat ${icewarp_dir}/var/${1}.pid)
+gcore -o "${debugdir}/${filename}" $(cat /opt/icewarp/var/${1}.pid)
 if [ -f "${debugdir}/${filename}" ]; then
-	echo "[$(date)] ${debugdir}/${filename}" >> ${fail_logfile}
+	echo "[$(date)] ${debugdir}/${filename}" >> ${fail_logfile} 2>&1	
 	return "${debugdir}/${filename}";
 		else
-	echo "[$(date)] dump of ${1} failed" >> ${fail_logfile}
+	echo "[$(date)] dump of ${1} failed" >> ${fail_logfile} 2>&1	
 	return "dump of ${1} failed";
 		fi
 }
@@ -78,20 +78,22 @@ if [ -f "${debugdir}/${filename}" ]; then
 # determine if we want to run dump in case of fail or we want to just restart service based on current hour
 dowedump()
 {
-declare -i hour=$(date +%H);
+hour=$(date +%H);
 if (( 8 > 10#${hour} && 10#${hour} > 20 )); then
-	echo "[$(date)] not between 8-20, we can dump .." >> ${fail_logfile}	
+	echo "[$(date)] not between 8-20, we can dump .." >> ${fail_logfile} 2>&1	
 	return 1
 		else
-	echo "[$(date)] between 8-20, we cannot dump .." >> ${fail_logfile}
+	echo "[$(date)] between 8-20, we cannot dump .." >> ${fail_logfile} 2>&1
 	return 0
+fi
 }
+#
 # check for duplicate process running, if so, exit with error.
 dowerun()
 {
 for pid in $(pgrep -f icewarp_watchdog.sh); do
     if [ ${pid} != $$ ]; then
-        echo "[$(date)] Process is already running with PID ${pid}, exiting 1." >> ${ok_logfile}
+        echo "[$(date)] Process is already running with PID ${pid}, exiting 1." >> ${ok_logfile} 2>&1
         exit 1
     fi
 done
@@ -111,26 +113,25 @@ if [ "${response}" == "200" ]; then
 				dump_service "control";
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, dump done, control restarted" >> ${fail_logfile}
+				echo "[$(date)] php killed, dump done, control restarted" >> ${fail_logfile} 2>&1
 					else
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, control restarted" >> ${fail_logfile}
+				echo "[$(date)] php killed, control restarted" >> ${fail_logfile} 2>&1
 			fi	
 fi
 sleep 1;
 response="null";
 response="$(http_check)";
 if [ "${response}" == "200" ]; then
-	echo "[$(date)] HTTPs check_OK, response ${rensponse}" >> ${ok_logfile}
+	echo "[$(date)] HTTPs check_OK, response ${response}" >> ${ok_logfile}
 	exit 0
 		else
 	kill_php;
 	rm -fv ${icewarp_path}/php/tmp/sess_* >> ${fail_logfile} 2>&1		
-	restart_service "control" >> ${fail_logfile} 2>&1
-	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile}
+	restart_service "control";
+	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile} 2>&1	
 fi
 #
-# todo : mount nfs, pack dumps and logs there, umount nfs
-# todo : report to mail/zabbix
+# todo : mount nfs, pack dumps and logs there, umount nfs		
 exit 0
