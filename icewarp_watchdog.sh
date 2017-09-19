@@ -1,3 +1,25 @@
+# update curl
+# centos 6
+# yum -y install http://nervion.us.es/city-fan/yum-repo/rhel6/x86_64/city-fan.org-release-1-13.rhel6.noarch.rpm
+# yum clean all
+# yum install libcurl
+
+# centos 7
+# wget http://cbs.centos.org/kojifiles/packages/curl/7.43.0/1.el7/x86_64/curl-7.43.0-1.el7.x86_64.rpm
+# wget http://cbs.centos.org/kojifiles/packages/curl/7.43.0/1.el7/x86_64/libcurl-7.43.0-1.el7.x86_64.rpm
+# yum -y install libcurl-7.43.0-1.el7.x86_64.rpm curl-7.43.0-1.el7.x86_64.rpm
+
+
+# test it from cmdline:
+# curl --connect-timeout 10 -m 10 -s -k -o /dev/null -w "%{http_code}" https://127.0.0.1/webmail/
+# should output 200
+# /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 1
+# /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0
+# curl --connect-timeout 20 --silent --insecure --login-options AUTH=DIGEST-MD5 --url "imaps://127.0.0.1/" --user "$(/opt/icewarp/tool.sh export account "*@*" u_admin u_password | grep ",1," | head -1 | sed -r 's|^(.*),1,(.*),|\1:\2|')" --request "EXAMINE INBOX" | grep EXISTS
+# /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 0
+# /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1
+# should output * <number> EXISTS
+
 #!/bin/bash
 # icewarp_watchdog.sh
 # beranek@icewarp.cz
