@@ -140,6 +140,7 @@ if [ "${response}" == "200" ]; then
 		gcore -o "${debugdir}/${filename}" ${ourpid}
 		echo "[$(date)] first try, dumping php worker ${ourpid} .." >> ${fail_logfile}
 		kill -9 ${ourpid} >> ${fail_logfile} 2>&1
+fi
 sleep 2;
 response="null";
 response="$(http_check)";
