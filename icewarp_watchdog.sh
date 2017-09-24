@@ -30,6 +30,7 @@ fail_logfile="/opt/icewarp/watchdog_fail.log";
 debugdir="/opt/icewarp/debug";
 mkdir -p ${debugdir};
 icewarp_path="/opt/icewarp";
+icewarp_logpath="/opt/icewarp/logs"
 #
 ## function :
 # return https response from 127.0.0.1/webmail/
@@ -58,6 +59,7 @@ done
 restart_service()
 {
 ${icewarp_path}/icewarpd.sh --stop "${1}";
+sleep 10;
 pkill -9 -f "${1}";
 ${icewarp_path}/icewarpd.sh --restart "${1}";
 }
@@ -81,7 +83,7 @@ if [ -f "${debugdir}/${filename}" ]; then
 dowedump()
 {
 declare -i hour=$(date +%H);
-if (( 8 < 10#${hour} && 10#${hour} < 20 )); then
+if (( 8 > 10#${hour} && 10#${hour} > 20 )); then
 	echo "[$(date)] not between 8-20, we can dump .." >> ${fail_logfile}	
 	echo "1"
 		else
@@ -101,26 +103,44 @@ for pid in $(pgrep -f icewarp_watchdog.sh); do
 done
 }
 #
-# pack generated dumps
-packdmp()
+# get latest failed php worker PID from icewarp phpslow.log
+getfailedphp()
 {
-
+local PHPPID=$(cat ${logpath}/php-fpm/phpslow.log | grep "pool www" | tail -1 | sed -r 's|^.*\[pool www\] pid (.*)$|\1|')
+echo "${PHPPID}"
 }
+#
+# pack generated dumps
+#packdmp()
+#{
+#
+#}
 #
 # move dumps to repository
-mvdmp()
-{
-
-}
+#mvdmp()
+#{
+#
+#}
 #
 # clean dumps
-rmdumps()
-{
-
-}
+#rmdumps()
+#{
+#
+#}
 ## MAIN ##
 #
 dowerun; # check for another icewarp_watchdog.sh running, if so, exit
+response="null";
+response="$(http_check)";
+if [ "${response}" == "200" ]; then
+	echo "[$(date)] HTTPs check_OK, response ${response}" >> ${ok_logfile}
+	exit 0
+		else
+		ourpid=$(getfailedphp)
+		gcore -o "${debugdir}/${filename}" ${ourpid}
+		echo "[$(date)] first try, dumping php worker ${ourpid} .." >> ${fail_logfile}
+		kill -9 ${ourpid} >> ${fail_logfile} 2>&1
+sleep 2;
 response="null";
 response="$(http_check)";
 if [ "${response}" == "200" ]; then
@@ -132,11 +152,11 @@ if [ "${response}" == "200" ]; then
 				dump_service "control";
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, dump done, control restarted" >> ${fail_logfile}
+				echo "[$(date)] second try, php killed, dump done, control restarted" >> ${fail_logfile}
 					else
 				kill_php;
 				restart_service "control";
-				echo "[$(date)] php killed, control restarted" >> ${fail_logfile}
+				echo "[$(date)] secod try, php killed, control restarted" >> ${fail_logfile}
 			fi	
 fi
 sleep 1;
@@ -149,7 +169,7 @@ if [ "${response}" == "200" ]; then
 	kill_php;
 	rm -fv ${icewarp_path}/php/tmp/sess_* >> ${fail_logfile} 2>&1		
 	restart_service "control" >> ${fail_logfile} 2>&1
-	echo "[$(date)] second try, php killed, sessions removed, control restarted" >> ${fail_logfile}
+	echo "[$(date)] last try, php killed, sessions removed, control restarted" >> ${fail_logfile}
 fi
 #
 # todo : mount nfs, pack dumps and logs there, umount nfs
