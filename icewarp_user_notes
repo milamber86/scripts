@@ -1,0 +1,47 @@
+## icewarp cloud vps under user icewarp
+
+# switch to icewarp user
+(create new storage for iw)
+zfs create storage/nfs4/ottotest
+zfs set sharenfs="-maproot=root 185.119.216.197" storage/nfs4/ottotest
+chown -Rv icewarp:icewarp storage/nfs4/ottotest
+
+(create new vps for iw)
+groupadd -g 1001 icewarp
+adduser -r -u 1001 -g 1001 icewarp
+id icewarp
+chown -R icewarp:icewarp /opt/icewarp
+visudo
+Cmnd_Alias IW = /opt/icewarp/icewarpd.sh
+icewarp ALL= NOPASSWD: IW
+
+nano /etc/icewarp/icewarp.conf
+change user to icewarp
+
+echo "185.138.220.30:/ottotest /mnt/data nfs4 vers=4,nolock,soft,proto=tcp,noatime,intr,sec=sys 0 0"
+mkdir -p /mnt/data
+mount /mnt/data
+
+
+# switch to icewarp user
+(update current storage)
+chown -Rv icewarp:icewarp storage/nfs4/ottotest
+
+(update current iw vps)
+groupadd -g 1001 icewarp
+adduser -r -u 1001 -g 1001 icewarp
+id icewarp
+chown -R icewarp:icewarp /opt/icewarp
+visudo
+Cmnd_Alias IW = /opt/icewarp/icewarpd.sh
+icewarp ALL= NOPASSWD: IW
+
+nano /etc/icewarp/icewarp.conf
+change user to icewarp
+
+
+## set iw caches and binary imapindex usage
+
+/opt/icewarp/tool.sh set system C_System_Services_IMAP_IndexStorage 1
+/opt/icewarp/tool.sh set system C_System_Services_SmallFilesCache_MaxFileSize 16777216
+/opt/icewarp/tool.sh set system C_System_Services_SmallFilesCache_Size 4294967296
