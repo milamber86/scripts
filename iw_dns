@@ -1,0 +1,48 @@
+DNS
+-- A
+DNS A  3600   mail.gamgroup.cz -> 185.119.216.63
+ 
+-- MX
+DNS MX 3600 0 @gamgroup.cz -> mail.gamgroup.cz
+ 
+-- A autodiscover
+SmartDiscover (A) 'autodiscover.gamgroup.cz':
+A 3600 autodiscover.gamgroup.cz -> 185.119.216.63
+ 
+-- SRV autodiscover
+SmartDiscover (SRV) '_autodiscover._tcp.gamgroup.cz':
+SRV 10 0 443 mail.gamgroup.cz
+ 
+-- SRV caldav
+WebDAV (SRV) '_caldav._tcp.gamgroup.cz':
+SRV 10 0 80 mail.gamgroup.cz
+ 
+WebDAV (SRV) '_caldavs._tcp.gamgroup.cz':
+SRV 10 0 443 mail.gamgroup.cz
+ 
+-- SRV carddav
+WebDAV (SRV) '_carddav._tcp.gamgroup.cz':
+SRV 10 0 80 mail.gamgroup.cz
+ 
+WebDAV (SRV) '_carddavs._tcp.gamgroup.cz':
+SRV 10 0 443 mail.gamgroup.cz
+ 
+-- SRV instant messaging
+Instant Messaging (SRV) '_xmpp-server._tcp.gamgroup.cz':
+SRV 10 0 5222 mail.gamgroup.cz
+ 
+Instant Messaging (SRV) '_xmpp-client._tcp.gamgroup.cz':
+SRV 10 0 5222 mail.gamgroup.cz
+ 
+--SRV iSchedule (Apple Mac) 
+iSchedule (SRV) '_ischedule._tcp.gamgroup.cz':
+SRV 10 10 443 mail.gamgroup.cz
+ 
+-- TXT SPF
+SPF (TXT) 'gamgroup.cz':
+TXT v=spf1 mx ~all
+ 
+-- TXT DKIM
+DKIM (TXT) 'default._domainkey.gamgroup.cz':
+TXT default._domainkey.gamgroup.cz
+v=DKIM1; k=rsa; n=1024; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQD/P9OPwe6qES4HLrkzyaN/VbSqSml5WWXbbbNzMCZfzXqlEgSVBTGGp6T+BjzsuNy3gOvNyT+ZCkO/iqQYeJW4JmiIe6bX9C0qYYJ7qniGMplz6RIq7Pm1uC5oJ75QmyEMUTJ9ONoFZibBgR8V7otYVXHLAsPkSUWYt6Vu2gAtCwIDAQAB
