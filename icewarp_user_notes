@@ -39,9 +39,11 @@ icewarp ALL= NOPASSWD: IW
 nano /etc/icewarp/icewarp.conf
 change user to icewarp
 
+!!! stop icewarp, remount storage, restart icewarp !!!
+
 
 ## set iw caches and binary imapindex usage
 
 /opt/icewarp/tool.sh set system C_System_Services_IMAP_IndexStorage 1
-/opt/icewarp/tool.sh set system C_System_Services_SmallFilesCache_MaxFileSize 16777216
+/opt/icewarp/tool.sh set system C_System_Services_SmallFilesCache_MaxFileSize 25165824
 /opt/icewarp/tool.sh set system C_System_Services_SmallFilesCache_Size 4294967296
