@@ -26,7 +26,7 @@ done
 #
 ### ### functions ###
 #
-## fill DOMAINS array with domain paths, input is full path ending with /
+## fill DOMAINS array with domain paths
 get_domain_path()
 {
 declare -a DOMAINS=( $(find "${START_DIR}" -maxdepth 1 -type d | tail -n +2) );
