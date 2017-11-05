@@ -13,15 +13,16 @@
 # ( script options are -d: starting directory, -s: max allowed files count for directory )
 #
 #
-FDUPES="$(which fdupes)"
-if [ "${FDUPES}" != *"fdupes" ]; then
-									echo "fdupes util missing, please install fdupes"
-									exit 1
+declare FDUPES="$(which fdupes)"
+if [ "${FDUPES}" == "" ];
+then
+  echo "fdupes util missing, please install fdupes, exiting here"
+  exit 1
 fi
 #
 # option defaults
-declare START_DIR="";
-declare -i MAX_SIZE=100000;
+declare START_DIR="/mnt/data/mail/";
+declare -i MAX_SIZE=10000;
 #
 # get command line options
 while getopts d:s: option
@@ -35,86 +36,44 @@ done
 #
 ### ### functions ###
 #
-## fill DOMAINS array with domain paths
+## returns domain paths
 get_domain_path()
 {
-declare -a DOMAINS=( $(find "${START_DIR}" -maxdepth 1 -type d | tail -n +2) );
-(>&2 echo ${DOMAINS[@]});
-(>&2 echo ${#DOMAINS[@]});
+echo "$(find "${START_DIR}" -maxdepth 1 -type d | tail -n +2)"
 return 0
 }
 #
 #
-## fill USERS array with user paths for all records from DOMAINS  
+## returns user paths for all records from DOMAINS  
 get_user_path()
 {
-declare local element;
-for element in $(seq 0 $((${#DOMAINS[@]} - 1)))
+for element in $(seq 0 $((${#DOMAINS[@]} -1))) 
 do
-  declare -a USERS+=(( $(find "${1}" -maxdepth 1 -type d | tail -n +2) );
+  echo "$(find "${DOMAINS[element]}" -maxdepth 1 -type d | tail -n +2)"
 done
-(>&2 echo ${USERS[@]});
-(>&2 echo ${#USERS[@]});
 return 0
 }
 #
 #
-## get file count for given path, input is full path ending with /, returns file count
+## returns file count for given path, input is full path ending with /
 get_folder_stats()
 {
-find "${1}" -maxdepth 1 -type f | wc -l
+echo "$(find "${1}" -maxdepth 1 -type f | wc -l)"
 return 0
 }
 #
 #
-## get file count for user maildir folders of given path, input is full path ending with /, returns maildir stats
+## returns subfolder paths over file limit, input is full path ending with /
 get_user_stats()
 {
-declare local FPATH="${1}";
-for I in $(find "${FPATH}" -maxdepth 1 -type d)
+IFS=$'\n'
+for path in $(find "${1}" -type d | tail -n +2 | xargs -I '{}' bash -c 'echo -e "$(find "{}" -maxdepth 1 -type f | wc -l)" "{}"')
 do
-  find "${I}" -maxdepth 1 -type d -print | xargs -0 -I {} sh -c 'echo -e $(find "{}" -printf "\n" | wc -l) "{}"' | sort -n | head -n -1;
-done
-return 0
-}
-#
-#
-## append path for optimize to end of OPTIMIZE array, input is full path ending with /
-append_to_optimize()
-{
-declare -a OPTIMIZE+=( ${1} );
-(>&2 echo ${OPTIMIZE[@]});
-(>&2 echo ${#OPTIMIZE[@]});
-return 0
-}
-#
-#
-## remove last element of OPTIMIZE array
-remove_from_optimize()
-{
-OPTIMIZE=("${OPTIMIZE[@]::${#OPTIMIZE[@]}-1}");
-(>&2 echo ${OPTIMIZE[@]});
-(>&2 echo ${#OPTIMIZE[@]});
-return 0
-} 
-#
-#
-## process all records in USERS, append those over file limit to OPTIMIZE array
-search_for_optimize()
-{
-declare local element;
-declare local path;
-for element in $(seq 0 $((${#USERS[@]} - 1)))
-do
-  for path in $(get_user_stats ${USERS[element]})
-  do
-    declare local -i size=$(echo "${path}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\1|')
-    if [ "${size}" -ge "${MAX_SIZE}" ]
+  declare -i dirsize=$(echo "${path}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\1|')
+  if [ "${dirsize}" -ge "${MAX_SIZE}" ]
     then
-      declare local appendpath=$(echo "${path}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\2|')
-      append_for_optimize "${appendpath}"
-    fi
-  done
+    echo "${path}"
+  fi
 done
 return 0
 }
@@ -133,7 +92,7 @@ return 0
 # TODO optimize search string
 optimize_garbage()
 {
-find "${1}" -maxdepth 1 -type f -name "*.imap" | xargs egrep -l "^Subject: Returned mail" | xargs -I {} mv -v "{}" "${1}""${GARBAGE_FOLDER}"
+>&2 find "${1}" -maxdepth 1 -type f -name "*.imap" | xargs egrep -l "^Subject: Returned mail" | xargs -I {} mv -v "{}" "${1}""${GARBAGE_FOLDER}"
 get_folder_stats "${1}"
 return 0
 }
@@ -142,7 +101,6 @@ return 0
 ## move older mail to subfolders, input is full path ending with /, returns new number of messages
 optimize_old()
 {
-declare local year;
 for year in {2016 2015 2014 2013 2012 2011 2010 2009 2008 2007 2006 2005 2004 2003 2002 2001 2000}
 do
   mkdir -p "${1}"${year}
@@ -161,26 +119,45 @@ return 0
 }
 #
 #
-### ### MAIN ###
-get_domain_path
-get_user_path
-search_for_optimize
+### ### MAIN ### ( fill DOMAINS, USERS, OPTIMIZE arrays and performe optimize on paths in OTPIMIZE )
+for element in $(get_domain_path)
+do
+  declare -a DOMAINS=( "${DOMAINS[@]}" "${element}" )
+done
+echo "DOMAINS all - ${DOMAINS[@]}" # debug
+echo "DOMAINS last added - ${DOMAINS[-1]}" # debug
+echo "DOMAINS elements count - ${#DOMAINS[@]}" # debug
+read -n 1 -s -r -p "Press any key to continue" # debug
+for element in $(get_user_path)
+do
+  declare -a USERS=( "${USERS[@]}" "${element}" )
+done
+echo "USERS all - ${USERS[@]}" # debug
+echo "USERS last added - ${USERS[-1]}" # debug
+echo "USERS elements count - ${#USERS[@]}" # debug
+read -n 1 -s -r -p "Press any key to continue" # debug
+for element in $(seq 0 $((${#USERS[@]} -1))) 
+do
+  unset tmparr
+  readarray tmparr <<< "$(get_user_stats "${USERS[element]}")"
+  if [ "${tmparr[@]}" != "" ] 
+   then 
+   declare -a OPTIMIZE=( "${OPTIMIZE[@]}" "${tmparr[@]}" )
+  fi
+done
+  echo "OPTIMIZE all - ${OPTIMIZE[@]}" # debug
+  echo "OPTIMIZE last added - ${OPTIMIZE[-1]}" # debug
+  echo "OPTIMIZE elements count - ${#OPTIMIZE[@]}" # debug
+  read -n 1 -s -r -p "Press any key to continue" # debug
 for element in $(seq 0 $((${#OPTIMIZE[@]} - 1)))
 do
   echo "Running optimize for path: ${OPTIMIZE[element]}"
-  declare -i files=$(echo "${OPTIMIZE[element]}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\1|')
   declare -i nodupes=$(echo $(optimize_dupes ${OPTIMIZE[element]}))
-  declare -i dupes=${files}-${nodupes}
-  declare -i files=${files}-${dupes}
-  echo "fdupes deleted ${dupes} duplicate files, ${files} files left in the folder"
+  echo "${nodupes} files left in the folder after dedup ..."
   declare -i nogarbage=$(echo $(optimize_garbage ${OPTIMIZE[element]}))
-  declare -i garbage=${files}-${nogarbage}
-  declare -i files=${files}-${garbage}
-  echo "garbage filter moved ${garbage} files to ${GARBAGE_FOLDER} subfolder, ${files} files left in the folder"
+  echo "${nogarbage} files left in the folder after garbage cleanup ..."
   declare -i noold=$(echo $(optimize_old ${OPTIMIZE[element]}))
-  declare -i old=${files}-${noold}
-  declare -i files=${files}-${old}
-  echo "garbage filter moved ${old} files to subfolders, ${files} files left in the folder"
+  echo "${noold} files left in the folder after old mail cleanup ..."
   echo "Work done for ${OPTIMIZE[element]}"
 done
 exit 0
