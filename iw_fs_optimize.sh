@@ -14,7 +14,7 @@
 #
 #
 declare FDUPES="$(which fdupes)"
-if [ "${FDUPES}" == "" ];
+if [ "${FDUPES}" == "" ]
 then
   echo "fdupes util missing, please install fdupes, exiting here"
   exit 1
@@ -22,7 +22,9 @@ fi
 #
 # option defaults
 declare START_DIR="/mnt/data/mail/"
-declare -i MAX_SIZE=1000;
+declare -i MAX_SIZE=1000
+#
+declare GARBAGE_FOLDER="GARBAGE"
 #
 # get command line options
 while getopts d:s: option
@@ -81,49 +83,61 @@ IFS=$'\n'
 for element in $(seq 0 $((${#OPTIMIZE[@]} -1)))
 do
 declare -i dirsize=$(echo "${OPTIMIZE[element]}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\1|')
-declare -i path=$(echo "${OPTIMIZE[element]}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\2|')
->&2 echo "Running optimize for path ${path} with ${dirsize} messages"
->&2 echo "Deduplicate .."
->&2 ${FDUPES} -fNI "${path}" # run deduplicate folder using fdupes -fNI
-declare -i dirsize=$(get_folder_stats "${path}")
->&2 echo "${path} - ${dirsize}"
-read -n 1 -s -r -p "Press any key to continue" # debug
-if [ ${dirsize} -ge ${MAX_SIZE} ] # if the folder still contains more than MAX_SIZE messages, run garbage cleanup
-  then
-  >&2 echo "Garbage cleanup .."
-  declare +i MAX_SIZE="${MAX_SIZE}"
-  >&2 find "${path}" -maxdepth 1 -type f -name "*.imap" | xargs egrep -l "^Subject: Returned mail" | xargs -I {} mv -v "{}" "${path}"/"${GARBAGE_FOLDER}"_${MAX_SIZE}
-  declare -i dirsize=$(get_folder_stats "${path}")
-  >&2 echo "${path} - ${dirsize}"
-  read -n 1 -s -r -p "Press any key to continue" # debug
-  if [ ${dirsize} -ge ${MAX_SIZE} ] # if the folder still contains more than MAX_SIZE messages, run old mail cleanup
-    then
-    >&2 echo "Old mail cleanup .."
-    for year in { "2016" "2015" "2014" "2013" "2012" "2011" "2010" "2009" "2008" "2007" "2006" "2005" "2004" "2003" "2002" "2001" "2000" }
-      do
-      mkdir -p "${path}"/${year}_${MAX_SIZE}
-      cp "${path}"/imapindex.dat "${path}"/${year}_${MAX_SIZE}/imapindex.dat
-      cp "${path}"/imapindex.bin "${path}"/${year}_${MAX_SIZE}/imapindex.bin
-      echo "*" > "${path}"/${year}_${MAX_SIZE}/flagsext.dat
-      >&2 find "${path}" -maxdepth 1 -type f -name "${year}*.imap" | xargs -I {} mv -v "{}" "${path}"${year}_${MAX_SIZE}
-      done
-  read -n 1 -s -r -p "Press any key to continue" # debug
-  mkdir -p "${path}"/1999_${MAX_SIZE}
-  cp "${path}"/imapindex.dat "${path}"/1999_${MAX_SIZE}/imapindex.dat
-  cp "${path}"/imapindex.bin "${path}"/1999_${MAX_SIZE}/imapindex.bin
-  echo "*" > "${path}"/1999_${MAX_SIZE}/flagsext.dat
-  >&2 find "${path}" -maxdepth 1 -type f -name "19*.imap" | xargs -I {} mv -v "{}" "${path}"1999_${MAX_SIZE}
-  declare -i dirsize=$(get_folder_stats "${path}")
-  >&2 echo "${path} - ${dirsize}"
-  read -n 1 -s -r -p "Press any key to continue" # debug
-  fi
-fi  
+declare path=$(echo "${OPTIMIZE[element]}" | sed -r s'|^([[:digit:]]+) (\/.*)$|\2|')
+sleep 1
+if [ -e "${path}/FLOCK.LOCK" ]
+  then 
+    >&2 echo "Lock for path ${path} exists, skipping"
+  else
+    touch "${path}/FLOCK.LOCK"
+    >&2 echo "Running optimize for path ${path} with ${dirsize} messages"
+    >&2 echo "Deduplicate .."
+    >&2 ${FDUPES} -fNI "${path}" # run deduplicate folder using fdupes -fNI
+    declare -i dirsize=$(get_folder_stats "${path}")
+    >&2 echo "${path} - ${dirsize} after dedup .."
+    if [ ${dirsize} -ge ${MAX_SIZE} ] # if the folder still contains more than MAX_SIZE messages, run garbage cleanup
+      then
+      >&2 echo "Garbage cleanup .."
+      declare suffix="${MAX_SIZE}"
+      find "${path}" -maxdepth 1 -type f -name "*.imap" | xargs -I "{}" egrep -l "^Subject: Returned mail" "{}" | xargs -I "{}" mv -v "{}" "${path}"/"${GARBAGE_FOLDER}"_${suffix}
+      declare -i dirsize=$(get_folder_stats "${path}")
+      >&2 echo "${path} - ${dirsize}"
+      if [ ${dirsize} -ge ${MAX_SIZE} ] # if the folder still contains more than MAX_SIZE messages, run old mail cleanup
+        then
+          >&2 echo "Old mail cleanup .."
+          for year in  2016 2015 2014 2013 2012 2011 2010 2009 2008 2007 2006 2005 2004 2003 2002 2001 2000 
+          do
+            declare -i tomove=$(find "${path}" -maxdepth 1 -type f -name "${year}*.imap" | wc -l)
+            if [ ${tomove} -ne 0 ] 
+            then
+              mkdir -p "${path}"/${year}_${suffix}
+              cp -n "${path}"/imapindex.dat "${path}"/${year}_${suffix}/imapindex.dat
+              cp -n "${path}"/imapindex.bin "${path}"/${year}_${suffix}/imapindex.bin
+              echo "*" > "${path}"/${year}_${suffix}/flagsext.dat
+              find "${path}" -maxdepth 1 -type f -name "${year}*.imap" | xargs -I "{}" mv "{}" "${path}"/${year}_${suffix}
+              declare -i dirsize=$(get_folder_stats "${path}")
+              >&2 echo "${path} - ${dirsize}"
+            fi
+          done
+          declare -i tomove=$(find "${path}" -maxdepth 1 -type f -name "19*.imap" | wc -l)
+          if [ ${tomove} -ne 0 ]
+          then
+            mkdir -p "${path}"/1999_${suffix}
+            cp -n "${path}"/imapindex.dat "${path}"/1999_${suffix}/imapindex.dat
+            cp -n "${path}"/imapindex.bin "${path}"/1999_${suffix}/imapindex.bin
+            echo "*" > "${path}"/1999_${suffix}/flagsext.dat
+            find "${path}" -maxdepth 1 -type f -name "19*.imap" | xargs -I "{}" mv "{}" "${path}"/1999_${suffix}
+            declare -i dirsize=$(get_folder_stats "${path}")
+            >&2 echo "${path} - ${dirsize} end."
+          fi
+      fi
+    fi
+fi
 done
 return 0
 }
 
-### ### MAIN ### ( fill DOMAINS, USERS, OPTIMIZE arrays and performe optimize on paths in OTPIMIZE )
-: <<'END'
+### ### MAIN ### ( fill DOMAINS, USERS, OPTIMIZE arrays and performe optimize on paths in OPTIMIZE )
 for element in $(get_domain_path)
 do
   declare -a DOMAINS=( "${DOMAINS[@]}" "${element}" )
@@ -149,11 +163,10 @@ do
    declare -a OPTIMIZE=( "${OPTIMIZE[@]}" "${tmparr[@]}" )
   fi
 done
-END
-readarray OPTIMIZE < /root/opt_all.txt # debug
   echo "OPTIMIZE all - ${OPTIMIZE[@]}" # debug
   echo "OPTIMIZE last added - ${OPTIMIZE[-1]}" # debug
   echo "OPTIMIZE elements count - ${#OPTIMIZE[@]}" # debug
   read -n 1 -s -r -p "Press any key to continue" # debug
+# seq  | xargs -I NONE --max-procs=4 -n 1 sleep 10 &
 optimize
 exit 0
