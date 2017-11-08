@@ -38,7 +38,7 @@ done
 #
 ### ### functions ###
 #
-## returns domain paths
+## returns domain paths for START_DIR path
 get_domain_path() {
 echo "$(find "${START_DIR}" -maxdepth 1 -type d | egrep -v "_incoming|_outgoing" | tail -n +2)"
 return 0
@@ -55,14 +55,14 @@ return 0
 }
 #
 #
-## returns file count for given path, input is full path ending with /
+## returns file count for given path
 get_folder_stats() {
 echo "$(find "${1}" -maxdepth 1 -type f | wc -l)"
 return 0
 }
 #
 #
-## returns subfolder paths over file limit, input is full path ending with /
+## returns subfolder paths over file limit for given path
 get_user_stats() {
 IFS=$'\n'
 for path in $(find "${1}" -type d | tail -n +2 | xargs -I '{}' bash -c 'echo -e "$(find "{}" -maxdepth 1 -type f | wc -l)" "{}"')
@@ -77,7 +77,7 @@ return 0
 }
 #
 #
-# run optimize on all OPTIMIZE paths
+# runs optimize on all OPTIMIZE paths
 optimize() {
 IFS=$'\n'
 for element in $(seq 0 $((${#OPTIMIZE[@]} -1)))
