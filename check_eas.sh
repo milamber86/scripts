@@ -12,10 +12,7 @@ DBPORT="discover";
 DBNAME="discover";
 USER="discover";
 PASS="discover";
-HOST="127.0.0.1";
 aURI="discover";
-aTYPE="discover";
-FOLDER="INBOX";
 
 declare DBUSER=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
 declare DBPASS=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
@@ -24,6 +21,10 @@ read -r USER aURI aTYPE aVER <<<$(echo "select * from devices order by last_sync
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0
 declare PASS=$(/opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1
+
+aTYPE="IceWarpAnnihilator";
+HOST="127.0.0.1";
+FOLDER="INBOX";
 
 result=$(/usr/bin/curl -k --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings) 
 
