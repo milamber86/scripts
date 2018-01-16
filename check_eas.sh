@@ -12,21 +12,35 @@ DBPORT="discover";
 DBNAME="discover";
 USER="discover";
 PASS="discover";
+HOST="127.0.0.1";
 aURI="discover";
+aTYPE="discover";
+aKey="discover";
+FOLDER="INBOX";
 
 declare DBUSER=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
 declare DBPASS=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
 read DBHOST DBPORT DBNAME <<<$(/opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
-read -r USER aURI aTYPE aVER <<<$(echo "select * from devices order by last_sync asc\\G" |  mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)$|\1 \2 \3 \4|')
+read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" |  mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0
 declare PASS=$(/opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1
 
-aTYPE="IceWarpAnnihilator";
-HOST="127.0.0.1";
-FOLDER="INBOX";
+HOST="127.0.0.1"
+aURI="000Prdel000"
+aTYPE="IceWarpAnnihilator"
+declare -i aSYNCKEY=${aKEY};
 
-result=$(/usr/bin/curl -k --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings) 
+# DEBUG:Test vars
+# aSYNCKEY=0;
+# USER="beranek@icewarp.cz"
+# PASS="ycul96321"
+# aVER="14.0"
+
+# DEBUG:Verbose mode 
+# result=`/usr/bin/curl -verbose -k --basic --user "$1:$2" -H "Expect: 100-continue" -H "Host: $5" -H "MS-ASProtocolVersion: 12.0" -H "Connection: Keep-Alive" -A "$4" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$5/Microsoft-Server-ActiveSync?Cmd=FolderSync&User=$1&DeviceId=$3&DeviceType=$4" | strings` 
+
+result=`/usr/bin/curl -k --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings` 
 
 if [[ $result == *$FOLDER* ]] 
 then 
