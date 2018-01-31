@@ -33,15 +33,6 @@ aURI="000Prdel000"
 aTYPE="IceWarpAnnihilator"
 declare -i aSYNCKEY=${aKEY};
 
-# DEBUG:Test vars
-# aSYNCKEY=0;
-# USER="beranek@icewarp.cz"
-# PASS="ycul96321"
-# aVER="14.0"
-
-# DEBUG:Verbose mode 
-# result=`/usr/bin/curl -verbose -k --basic --user "$1:$2" -H "Expect: 100-continue" -H "Host: $5" -H "MS-ASProtocolVersion: 12.0" -H "Connection: Keep-Alive" -A "$4" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$5/Microsoft-Server-ActiveSync?Cmd=FolderSync&User=$1&DeviceId=$3&DeviceType=$4" | strings` 
-
 result=`/usr/bin/curl -k --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @/root/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings` 
 
 if [[ $result == *$FOLDER* ]] 
