@@ -1,29 +1,34 @@
 #!/bin/bash
-#-------------------------------------------
-# IceWarp cfg and db backup script for cloud
-# beranek@icewarp.cz
-#---------------init vars-------------------
-ID=/usr/bin/id;
-ECHO=/bin/echo;
-backuppath=/mnt/backup;
-dbuser=root;
-dbpass=merak1;
-dbhost=127.0.0.1;
-db1=accounts;
-db2=antispam;
-db3=groupware;
-#---------------do backup-------------------
-# make sure we're running as root
-if (( `$ID -u` != 0 )); then { $ECHO "Sorry, must be root.  Exiting..."; exit; } fi
-#
+backuppath="/mnt/data/backup"
 mkdir -p ${backuppath}
-mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} ${db1} | gzip -c | cat > ${backuppath}/bck_${db1}`date +%Y%m%d-%H%M`.sql.gz
-mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} ${db2} | gzip -c | cat > ${backuppath}/bck_${db2}`date +%Y%m%d-%H%M`.sql.gz
-mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} ${db3} | gzip -c | cat > ${backuppath}/bck_${db3}`date +%Y%m%d-%H%M`.sql.gz
+dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbpass | tr -d '\040\011\015' | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|')"
+wcdbuser="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbuser | tr -d '\040\011\015' | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')"
+read -r dbhost dbport wcdbname <<< $(cat /opt/icewarp/config/_webmail/server.xml | grep dbconn | tr -d '\040\011\015' | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|')
+read -r accdbname accdbuser <<< $(/opt/icewarp/tool.sh get system c_system_storage_accounts_odbcconnstring | perl -pe 's|^c_system_storage_accounts_odbcconnstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
+read -r aspdbname aspdbuser <<< $(/opt/icewarp/tool.sh get system c_as_challenge_connectionstring | perl -pe 's|^c_as_challenge_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
+read -r grwdbname grwdbuser <<< $(/opt/icewarp/tool.sh get system c_gw_connectionstring | perl -pe 's|^c_gw_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
+read -r dcdbname dcdbuser <<< $(/opt/icewarp/tool.sh get system c_accounts_global_accounts_directorycacheconnectionstring | perl -pe 's|^c_accounts_global_accounts_directorycacheconnectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
+easdbname="$(/opt/icewarp/tool.sh get system c_activesync_dbconnection | perl -pe 's|^c_activesync_dbconnection: mysql:host=.*;port=.*;dbname=(.*)$|\1|')"
+easdbuser="$(/opt/icewarp/tool.sh get system c_activesync_dbuser | perl -pe 's|^c_activesync_dbuser: (.*)$|\1|')"
+easdbpass="$(/opt/icewarp/tool.sh get system c_activesync_dbpass | perl -pe 's|^c_activesync_dbpass: (.*)$|\1|')"
+if [[ "${accdbuser}" = *"DBUIWC"* ]]
+then # generic_cloud ( DBUIWC*, DBUIWC*EAS, DBUIWC*WC)
+/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_asp_grw_dc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${backuppath}/bck_db_eas_${easdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${backuppath}/bck_db_wc_${wcdbname}`date +%Y%m%d-%H%M`.sql.gz &
+else # non-generic cloud ( other db name settings )
+/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${aspdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${backuppath}/bck_db_asp_${aspdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${grwdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${backuppath}/bck_db_grw_${grwdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${dcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${backuppath}/bck_db_dc_${dcdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${backuppath}/bck_db_eas_${easdbname}`date +%Y%m%d-%H%M`.sql.gz &
+/usr/bin/mysqldump --single-transaction -u ${wcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${backuppath}/bck_db_wc_${wcdbname}`date +%Y%m%d-%H%M`.sql.gz &
+fi
+wait ${!}
 tar -czf ${backuppath}/bck_cnf`date +%Y%m%d-%H%M`.tgz /opt/icewarp/config > /dev/null 2>&1
 tar -czf ${backuppath}/bck_cal`date +%Y%m%d-%H%M`.tgz /opt/icewarp/calendar > /dev/null 2>&1
 /opt/icewarp/tool.sh export account "*@*" u_backup > ${backuppath}/bck_acc_backup`date +%Y%m%d-%H%M`.csv
 /opt/icewarp/tool.sh export domain "*" d_backup > ${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv
-find ${backuppath}/ -type f -name "bck_*" -mtime +2 -delete > /dev/null 2>&1
+find ${backuppath}/ -type f -name "bck_*" -mtime +3 -delete > /dev/null 2>&1
 exit 0
 
