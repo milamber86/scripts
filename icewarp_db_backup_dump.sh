@@ -1,6 +1,8 @@
 #!/bin/bash
 backuppath="/mnt/data/backup"
 mkdir -p ${backuppath}
+backupsrvhost="${1}" # if we take backups from another host
+backupsrvport="${2}" # than the one we connect to
 dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbpass | tr -d '\040\011\015' | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|')"
 wcdbuser="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbuser | tr -d '\040\011\015' | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')"
 read -r dbhost dbport wcdbname <<< $(cat /opt/icewarp/config/_webmail/server.xml | grep dbconn | tr -d '\040\011\015' | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|')
@@ -11,6 +13,8 @@ read -r dcdbname dcdbuser <<< $(/opt/icewarp/tool.sh get system c_accounts_globa
 easdbname="$(/opt/icewarp/tool.sh get system c_activesync_dbconnection | perl -pe 's|^c_activesync_dbconnection: mysql:host=.*;port=.*;dbname=(.*)$|\1|')"
 easdbuser="$(/opt/icewarp/tool.sh get system c_activesync_dbuser | perl -pe 's|^c_activesync_dbuser: (.*)$|\1|')"
 easdbpass="$(/opt/icewarp/tool.sh get system c_activesync_dbpass | perl -pe 's|^c_activesync_dbpass: (.*)$|\1|')"
+if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
+if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 if [[ "${accdbuser}" = *"DBUIWC"* ]]
 then # generic_cloud ( DBUIWC*, DBUIWC*EAS, DBUIWC*WC)
 /usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_asp_grw_dc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
@@ -31,4 +35,3 @@ tar -czf ${backuppath}/bck_cal`date +%Y%m%d-%H%M`.tgz /opt/icewarp/calendar > /d
 /opt/icewarp/tool.sh export domain "*" d_backup > ${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv
 find ${backuppath}/ -type f -name "bck_*" -mtime +3 -delete > /dev/null 2>&1
 exit 0
-
