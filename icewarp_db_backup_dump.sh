@@ -3,7 +3,12 @@ backuppath="/mnt/data/backup"
 mkdir -p ${backuppath}
 backupsrvhost="${1}" # if we take backups from another host
 backupsrvport="${2}" # than the one we connect to
-dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbpass | tr -d '\040\011\015' | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|')"
+test="$(find /usr/lib64 -type f -name "Entities.pm")"
+if [[ -z "${test}" ]]
+  then
+  /usr/bin/yum -y install perl-HTML-Encoding.noarch
+fi
+dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbpass | tr -d '\040\011\015' | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')"
 wcdbuser="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbuser | tr -d '\040\011\015' | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')"
 read -r dbhost dbport wcdbname <<< $(cat /opt/icewarp/config/_webmail/server.xml | grep dbconn | tr -d '\040\011\015' | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|')
 read -r accdbname accdbuser <<< $(/opt/icewarp/tool.sh get system c_system_storage_accounts_odbcconnstring | perl -pe 's|^c_system_storage_accounts_odbcconnstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
