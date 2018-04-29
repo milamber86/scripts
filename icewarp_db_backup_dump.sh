@@ -1,16 +1,18 @@
 #!/bin/bash
 backuppath="/mnt/data/backup"
+mkdir -p /mnt/data
 mkdir -p ${backuppath}
 backupsrvhost="${1}" # if we take backups from another host
 backupsrvport="${2}" # than the one we connect to
 test="$(find /usr/lib64 -type f -name "Entities.pm")"
 if [[ -z "${test}" ]]
   then
+  /usr/bin/yum -y install epel-release
   /usr/bin/yum -y install perl-HTML-Encoding.noarch
 fi
-dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbpass | tr -d '\040\011\015' | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')"
-wcdbuser="$(cat /opt/icewarp/config/_webmail/server.xml | grep dbuser | tr -d '\040\011\015' | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')"
-read -r dbhost dbport wcdbname <<< $(cat /opt/icewarp/config/_webmail/server.xml | grep dbconn | tr -d '\040\011\015' | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|')
+dbpass="$(cat /opt/icewarp/config/_webmail/server.xml | cat /opt/icewarp/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')"
+wcdbuser="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')"
+read -r dbhost dbport wcdbname <<< $(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|')
 read -r accdbname accdbuser <<< $(/opt/icewarp/tool.sh get system c_system_storage_accounts_odbcconnstring | perl -pe 's|^c_system_storage_accounts_odbcconnstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
 read -r aspdbname aspdbuser <<< $(/opt/icewarp/tool.sh get system c_as_challenge_connectionstring | perl -pe 's|^c_as_challenge_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
 read -r grwdbname grwdbuser <<< $(/opt/icewarp/tool.sh get system c_gw_connectionstring | perl -pe 's|^c_gw_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
@@ -18,6 +20,7 @@ read -r dcdbname dcdbuser <<< $(/opt/icewarp/tool.sh get system c_accounts_globa
 easdbname="$(/opt/icewarp/tool.sh get system c_activesync_dbconnection | perl -pe 's|^c_activesync_dbconnection: mysql:host=.*;port=.*;dbname=(.*)$|\1|')"
 easdbuser="$(/opt/icewarp/tool.sh get system c_activesync_dbuser | perl -pe 's|^c_activesync_dbuser: (.*)$|\1|')"
 easdbpass="$(/opt/icewarp/tool.sh get system c_activesync_dbpass | perl -pe 's|^c_activesync_dbpass: (.*)$|\1|')"
+if [ -z "${dbpass}" ]; then dbpass="pass_not_discovered"; fi
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 if [[ "${accdbuser}" = *"DBUIWC"* ]]
