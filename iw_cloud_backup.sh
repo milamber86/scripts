@@ -17,10 +17,12 @@ read -r accdbname accdbuser <<< $(/opt/icewarp/tool.sh get system c_system_stora
 read -r aspdbname aspdbuser <<< $(/opt/icewarp/tool.sh get system c_as_challenge_connectionstring | perl -pe 's|^c_as_challenge_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
 read -r grwdbname grwdbuser <<< $(/opt/icewarp/tool.sh get system c_gw_connectionstring | perl -pe 's|^c_gw_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
 read -r dcdbname dcdbuser <<< $(/opt/icewarp/tool.sh get system c_accounts_global_accounts_directorycacheconnectionstring | perl -pe 's|^c_accounts_global_accounts_directorycacheconnectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|')
-easdbname="$(/opt/icewarp/tool.sh get system c_activesync_dbconnection | perl -pe 's|^c_activesync_dbconnection: mysql:host=.*;port=.*;dbname=(.*)$|\1|')"
+easdbname="$(/opt/icewarp/tool.sh get system c_activesync_dbconnection | /opt/icewarp/tool.sh get system c_activesync_dbconnection | egrep -o "mysql:host=.*;dbname=.*" | perl -pe 's|^mysql:host=.*;port=.*;dbname=(.*)$|\1|')"
 easdbuser="$(/opt/icewarp/tool.sh get system c_activesync_dbuser | perl -pe 's|^c_activesync_dbuser: (.*)$|\1|')"
 easdbpass="$(/opt/icewarp/tool.sh get system c_activesync_dbpass | perl -pe 's|^c_activesync_dbpass: (.*)$|\1|')"
-if [ -z "${dbpass}" ]; then dbpass="pass_not_discovered"; fi
+if [ -z "${easdbpass}" ]; then easdbpass="easdbpass not discovered"; fi
+if [[ "${dbpass}" =~ "^sqlite:.*" ]]; then dbpass="${easdbpass}"; fi
+if [ -z "${dbpass}" ]; then dbpass="dbpass not discovered"; fi
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 if [[ "${accdbuser}" = *"DBUIWC"* ]]
