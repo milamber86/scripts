@@ -12,8 +12,8 @@ adduser -r -u 1001 -g 1001 icewarp
 id icewarp
 chown -R icewarp:icewarp /opt/icewarp
 visudo
-Cmnd_Alias IW = /opt/icewarp/icewarpd.sh
-icewarp ALL= NOPASSWD: IW
+Cmnd_Alias IW = /opt/icewarp/icewarpd.sh, /opt/icewarp/tool.sh
+icewarp ALL=(root) NOPASSWD: IW
 
 nano /etc/icewarp/icewarp.conf
 change user to icewarp
