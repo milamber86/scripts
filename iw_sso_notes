@@ -1,0 +1,26 @@
+https://esupport.icewarp.com/index.php?/Knowledgebase/Article/View/542/0/configuring-sso-single-sign-on
+
+IW server: icewarp.dsidata.sk
+IW domain: dsidata.sk
+AD domain: no.dsidata.sk
+
+ktpass -out c:\HTTP#icewarp.dsidata.sk@NO.DSIDATA.SK -princ HTTP/icewarp.dsidata.sk@NO.DSIDATA.SK -mapUser icewarp_sso_http@NO.DSIDATA.SK -mapOp set -pass * -ptype KRB5_NT_PRINCIPAL
+ktpass -out c:\imap#icewarp.dsidata.sk@NO.DSIDATA.SK -princ imap/icewarp.dsidata.sk@NO.DSIDATA.SK -mapUser icewarp_sso_imap@NO.DSIDATA.SK -mapOp set -pass * -ptype KRB5_NT_PRINCIPAL
+ktpass -out c:\smtp#icewarp.dsidata.sk@NO.DSIDATA.SK -princ smtp/icewarp.dsidata.sk@NO.DSIDATA.SK -mapUser icewarp_sso_smtp@NO.DSIDATA.SK -mapOp set -pass * -ptype KRB5_NT_PRINCIPAL
+ktpass -out c:\xmpp#icewarp.dsidata.sk@NO.DSIDATA.SK -princ xmpp/icewarp.dsidata.sk@NO.DSIDATA.SK -mapUser icewarp_sso_xmpp@NO.DSIDATA.SK -mapOp set -pass * -ptype KRB5_NT_PRINCIPAL
+
+IceWarp Desktop Client instalace a konfigurace v doméně dsidata.sk
+
+Instalační balíček:
+http://desktopclient.icewarp.com/dist/v7.1.33020_IceWarp/setup.msi
+
+Postup pro zajištění správného AutoDiscover nastavení v případě heterogenní domény:
+
+v klíči HKEY_CURRENT_USER\Software\IceWarp Desktop Client\Autodiscover se vytvoří hodnota typu REG_SZ, název je doména ("emclient.com"), hodnota je URI, ze které se autodiscover XML má načíst. 
+Hodnota může být umístěná i na lokálním disku ("C:\Temp\a.xml"), síťové umístění ("\\networkshare\Temp\a.xml"), 
+nebo i URL ("https://iw_pilot.domenazakaznika.com/autodiscover/autodiscover.xml").
+To poslední možnost umožňuje vyhnout se vyrábění toho XML souboru ze zadaní, protože ten není v podstatě nic jiného než redirect.
+
+Konkrétní nastavení pro dsidata.sk:
+URL: https://icewarp.dsidata.sk/autodiscover/autodiscover.xml vložit přímo do REG_SZ klíče v registru spolu s doménou uživatele dsidata.sk
+
