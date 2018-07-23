@@ -20,8 +20,6 @@ setcap 'cap_net_bind_service=+ep' /opt/icewarp/smtp
 setcap 'cap_net_bind_service=+ep' /opt/icewarp/pop3
 setcap 'cap_net_bind_service=+ep' /opt/icewarp/control
 setcap 'cap_net_bind_service=+ep' /opt/icewarp/im
-setcap 'cap_net_bind_service=+ep' /opt/icewarp/gw
-setcap 'cap_net_bind_service=+ep' /opt/icewarp/cak
 setcap 'cap_net_bind_service=+ep' /opt/icewarp/cal
 
 
