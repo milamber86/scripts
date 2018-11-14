@@ -1,7 +1,7 @@
 @echo off
 
- set dbUser=root
- set dbPassword=merak1
+ set dbUser=user
+ set dbPassword=pass
  set backupDir="C:\Program Files (x86)\IceWarp\backup\dbdump\"
  set mysqlDataDir="C:\ProgramData\MySQL\MySQL Server 5.6\data"
  set mysqldump="C:\Program Files\MySQL\MySQL Server 5.6\bin\mysqldump.exe"
