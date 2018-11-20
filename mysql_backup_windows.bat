@@ -1,7 +1,7 @@
 @echo off
 
- set dbUser=root
- set dbPassword=merak1
+ set dbUser=user
+ set dbPassword=pass
  set iwMainDir="C:\Program Files\IceWarp"
  set rtDir="C:\Program Files\IceWarp\backup\temp"
  set backupDir="C:\Program Files\IceWarp\backup\dbdump"
