@@ -1,11 +1,16 @@
 @echo off
 
- set dbUser=user
- set dbPassword=pass
- set backupDir="C:\Program Files (x86)\IceWarp\backup\dbdump\"
- set mysqlDataDir="C:\ProgramData\MySQL\MySQL Server 5.6\data"
- set mysqldump="C:\Program Files\MySQL\MySQL Server 5.6\bin\mysqldump.exe"
+ set dbUser=root
+ set dbPassword=merak1
+ set iwMainDir="C:\Program Files\IceWarp"
+ set rtDir="C:\Program Files\IceWarp\backup\temp"
+ set backupDir="C:\Program Files\IceWarp\backup\dbdump"
+ set mysqlDataDir="C:\Program Files\MariaDB 10.2\data"
+ set mysqldump="C:\Program Files\MariaDB 10.2\bin\mysqldump.exe"
  set zip="C:\Program Files\7-Zip\7z.exe"
+
+ if not exist %backupDir% mkdir %backupDir%
+ if not exist %rtDir% mkdir %rtDir%
 
  :: get date
  for /F "tokens=2-4 delims=/ " %%i in ('date /t') do (
@@ -36,11 +41,16 @@
  %mysqldump% --host="localhost" --user=%dbUser% --password=%dbPassword% --single-transaction --add-drop-table --databases %%f > %backupDir%\%dirName%\%%f.sql
 
  %zip% a -tgzip %backupDir%\%dirName%\%%f.sql.gz %backupDir%\%dirName%\%%f.sql
-
  del %backupDir%\%dirName%\%%f.sql
  )
  popd
 
+ :: backup server settings
+ %iwMainDir%\tool.exe export account "*@*" u_backup > %backupDir%\%dirName%\acc_u_backup.csv
+ %iwMainDir%\tool.exe export domain "*" d_backup > %backupDir%\%dirName%\dom_d_backup.csv
+ %zip% a -r %backupDir%\%dirName%\cfg.7z %iwMainDir%\config
+ %zip% a -r %backupDir%\%dirName%\cal.7z %iwMainDir%\calendar
+
  :: remove backups older than3 days
  ROBOCOPY %backupDir% %rtDir% /mov /minage:3
- del %rtDir% /q
+ del "%rtDir%" /q
