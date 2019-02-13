@@ -22,7 +22,7 @@ fi
 # iw webclient check
 wcstat()
 {
-HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 3 https://127.0.0.1/webmail/)"
+HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 5 https://127.0.0.1/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
                         echo "OK" > /opt/icewarp/var/httpstatus.mon
                           else
