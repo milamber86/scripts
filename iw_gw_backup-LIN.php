@@ -6,6 +6,28 @@
 //  * Written in the begging of March 2014 by Alan_6k8, Free to use and modify
 //  * To restore a user's groupware data, first delete using the current data using the administration console
 //  * then use the restore function in the console to restore the groupware data using the backup xml file
+//  *
+//  * zavolat fci pres:
+//  * 
+//  * /opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /path/to/migrate_gw.php user@domain
+//  * 
+//  * Uvnitr skriptu nastavit vychozi hodnoty pro remote DB. Lokalni DB se bere z GW configu lokalniho IW serveru, ze ktereho bezi skript.
+//  * 
+//  * 
+//  * Export_gw.php a Import_gw.php jsou podobne. Vola se:
+//  * 
+//  * Export
+//  * /opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /path/to/export_gw.php [domain.com] /path/to/output.xml
+//  * 
+//  * (domena je v hranatych zavorkach)
+//  * 
+//  * 
+//  * 
+//  * Stejne tak import
+//  * 
+//  * /opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /path/to/export_gw.php /path/to/output.xml
+//  * 
+//  * 
 //
 define( 'DS', DIRECTORY_SEPARATOR );
 define( 'SHAREDLIB_PATH', get_cfg_var( 'icewarp_sharedlib_path' ) );
