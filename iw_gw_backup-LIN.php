@@ -25,7 +25,7 @@
 //  * 
 //  * Stejne tak import
 //  * 
-//  * /opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /path/to/export_gw.php /path/to/output.xml
+//  * /opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /path/to/import_gw.php /path/to/output.xml
 //  * 
 //  * 
 //
