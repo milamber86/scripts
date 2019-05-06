@@ -1,0 +1,19 @@
+1/ vytvořit doménu
+# /opt/icewarp/tool.sh create domain testdkim.local
+Domain testdkim.local created.
+
+2/ vygenerovat domainkey.dat
+# SELECTOR="test";DOMENA="testdkim.local";/opt/icewarp/tool.sh export domain "${DOMENA}" d_dkim_generateprivatekey | sed -r "s|${DOMENA},||" | sed -r 's|^,$||' | egrep -v "\-\-\-\-\-" > ${DOMENA}_dkim.key;echo "1" > /opt/icewarp/config/${DOMENA}/domainkey.dat;echo "${SELECTOR}" >> /opt/icewarp/config/${DOMENA}/domainkey.dat;echo "${DOMENA}" >> /opt/icewarp/config/${DOMENA}/domainkey.dat;echo "0" >> /opt/icewarp/config/${DOMENA}/domainkey.dat;dos2unix ${DOMENA}_dkim.key;cat ${DOMENA}_dkim.key | tr '\n' ' ' | tr -d '[:blank:]' >> /opt/icewarp/config/${DOMENA}/domainkey.dat
+dos2unix: converting file testdkim.local_dkim.key to Unix format ...
+
+3/ kontrola domainkey.dat
+# cat /opt/icewarp/config/testdkim.local/domainkey.dat
+1
+test
+testdkim.local
+0
+MIIEnwIBAAKCAQD+lf0NHp5lbXvMVI34ABv42GBx75oZx8jeimP4t/MeB9BSofKzHbAdt6fbViEzWjPnLTuqZ3S4j9IkgdEPYQb4r3KIpJfIaVc7v6ceAxtgn1jcq1x+9k1vhhRxE1WYTmamy9BRzclpHpOG+9pOCtOhpKFjrUmpGMn/8PmW4ZMr+tpwd9MRzuqVmRSolorbSy+nV/kPEWO/TABHmw4c7v438NHYU+xi2wQLKP9dXUh3abdHt3Ny/aphNduRhjq0q+bX4S2ZN/eIo0IoCGIuSGiukRCnvMBfOHzTjGgFBsclPqYf9qkBV9HXZcIPrTsBW4FQ1euGpB8+czQhzKtlPjHbAgMBAAECggEAt6kewEs5e/SK3fKV5La3d0Mp+Kgg5L5TM/BkhLa3xg9fA23ft8YQGrA2gS5Wj0Rgs0LXi2xNMSRYNowMdOrLa7auitMqyKLuEqWFe0pEguUR50gcV196p5zzvEt1cYYF2gipBYrO5W3wge3JJIn8+NzarR0DSeEfQOvoMygS0yMaAJQh2+hXXaf/Hms/r/wS2YhHvMLDKnYx+ggeq5kwQXbjaHP2lkdIXBdzt/DXdv38NtAJODKzWr1+41sFMbR71fjYJONlRfTAM1SLXt9VuPpMl3D6X1WyqQEhpZA8gPwj9SXQDTCpI0CjjU9Exra6HUDRRWS3zrdzBkcOXKQGSQKBgP83htwlxvtRmuV8o3udGX04LmvXjqjSwqrttCmEZTPyxe6WMb2j4wcx2b+bFWATROBmhjD7P6mnlgrKHsq6kBSWE0Gb7HievmsRxEWyPk8q/JbX18aR+MT3QzwUFS4rKqz7ibyYKshI4T91e5p/z3gSjnm3LgCu0YRMVSjXP9plAoGA/133TYCWMVMU5QP8usR5Rj2RlQesv5W0dXber5k/knPIF6jdLYmFb918PDGljsH44y1t9/zcuQACpWL3yLVnWlzwYrO3rg6naPJiazTDK3N6Bah3mFoxOSHAb91KBMl+gG0Y0mHtYBVjKClTfALjzEY03pLa6Cm4hDhe5ZiQ9z8CgYAjzL0tGlt8G2lX8ZDZISNXLk9Mr1MCmXXXFjrka/7qN47ONeFKUbfh5Xs+5lksPee2dosySbwXZzujzdBd7aeSS67t0BpunQ3m5PocMLGO11/RJPvOjeFQd8LFpaeG72UwGKSsgMfXimmWRjuNY4pNtISpzCk2zU70eOSlMvRxBQKBgELCYP2M6TbZ3nOEmFSHOqEnRWDtkbbAP14aBltnt9vkkuHEjpXyBsVY5LqjzAFHKnbRkJctLtLactajyd1ZtzxDYcCb9R/2ysM/4oTeVUuNs8+43BMjOQ0Tishz1H7t4jlWzA9r9G+TB8ofC6k25DCqBfZN9BaPmaJPTle9i+BnAoGA26KT9hTDF4SCYpfEeydhFt5l2/j3zvuAPudXhTG1Y1dHdWmiEYXCyw5xM8TrlESWPXTLNJuYNv5SYIDAfOc5iBYpzTqd6rKbEIzaES638T7qaGQdv1tbQ48V8dHn8iQP0rJS6k6hoL7H612avC+6xzm8nw1nVqUU6iHHRU6uJUE=
+
+4/ export selector data pro nastavení DNS záznamu
+# /opt/icewarp/tool.sh export domain "testdkim.local" d_dkim_retrieveselectordata
+testdkim.local,v=DKIM1; k=rsa; n=2048; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/pX9DR6eZW17zFSN+AAb+Nhgce+aGcfI3opj+LfzHgfQUqHysx2wHben21YhM1oz5y07qmd0uI/SJIHRD2EG+K9yiKSXyGlXO7+nHgMbYJ9Y3KtcfvZNb4YUcRNVmE5mpsvQUc3JaR6ThvvaTgrToaShY61JqRjJ//D5luGTK/racHfTEc7qlZkUqJaK20svp1f5DxFjv0wAR5sOHO7+N/DR2FPsYtsECyj/XV1Id2m3R7dzcv2qYTXbkYY6tKvm1+EtmTf3iKNCKAhiLkhorpEQp7zAXzh804xoBQbHJT6mH/apAVfR12XCD607AVuBUNXrhqQfPnM0IcyrZT4x2wIDAQAB,
