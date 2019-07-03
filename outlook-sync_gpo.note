@@ -1,0 +1,29 @@
+--- hromadna instalace outlook-sync pomoci GPO a autoconfigure uctu pres autodiscover s kerberos auth
+
+* predpokladem je fukcni kerberos SSO s IceWarp pro HTTP, imap, smtp ( https://esupport.icewarp.com/index.php?/Knowledgebase/Article/View/542/0/configuring-sso-single-sign-on )
+* dale je treba nastavit autodiscover DNS zaznamy pro AD domenu ( obvykle neco.loc, neco.local, zjistime v IW admin, nastaveni domeny, directory service - test connection, napr. DC=NECO,DC=LOCAL
+
+napr. pro AD domenu ICEWARP.LOC, mail domenu icewarp.cz a server mail.icewarp.cz s vnitrni IP 192.168.1.100:
+DNS IN A mail.icewarp.cz -> 192.168.1.100
+DNS IN A autodiscover.icewarp.loc -> 192.168.1.100
+DNS IN SRV _autodiscover._tcp.icewarp.loc 0 0 443 mail.icewarp.cz
+( pro mail.icewarp.cz a autodiscover.icewarp.loc musi byt na IceWarp serveru vystavene certifikaty, ktere jsou pro nastavovane klienty duveryhodne )
+
+* nakopirovat instalacni cab pro .net3.5 na sitove umisteni, kam maji vsichni povolen read access. Zde \\server\shared\
+( https://mail.icewarp.cz/webdav/ticket/eJwNyEEOwiAQAMDf7A1dCoRy2Ksf8AULLA1pCgZqqr,XOc5Gjm3QGXMwLFDo2d.xjy8kesAk5.NSVocogjBILdp669CvFoSgkss6.X.iL3w,ahp99nKqq7bcr6manOVjVG9ZDm5ZvTjtvMktcYSdgmfDbDXGH46qKaQ_/microsoft-windows-netfx3-ondemand-package.cab )
+
+* pripravit script pro instalaci .net3.5
+vytvorime .bat file, obsah napr. ( zmen cestu k instalacnim souborum na siti, i.e. /Source: a cestu k logfile za >. K logfile musi mit kazdy pocitac write access ):
+Dism /online /enable-feature /featurename:NetFX3 /All /Source:\\server\shared /LimitAccess > \\server\shared\pub\log.txt
+
+* nakopirovat vytvoreny .bat file do \\server\shared\
+
+* vytvorit computer policy se scriptem pro instalaci .net3.5 z naseho .bat na \\server\shared\ ( https://www.petri.com/run-startup-script-batch-file-with-administrative-privileges )
+
+* nakopirovat aktualni instalaci outlook-sync msi do \\server\shared\ spolu s transition filem
+( https://mail.icewarp.cz/webdav/ticket/eJwFwcENgzAMAMBt,AMcYyvJw18W6ACI4AShCkXC9MH2vTtUNs7B0PK8VWj66b,S7xd2XcBVYqGWBLFWhFsHChxZMCaGqnCqWKBZmiGWPLn39fJzvPyBr3KhFIR2tj.mZxym/sso_msi.mst ) 
+
+* vytvorit computer policy pro instalaci outlook-sync s pouzitim transition file ( https://www.itninja.com/blog/view/deploying-mst-files-using-group-policy ) s temito settingy:
+    Computer Configuration > Policies > Administrative Templates > Windows Components> Window Installer > Always install with elevated privileges
+    Computer Configuration > Policies > Administrative Templates > System > Logon > Always wait for the network at computer startup and logon
+    Computer Configuration > Policies > Administrative Templates > System > Group Policy > Software Installation policy processing (check "Allow processing across a slow network connection")
