@@ -1,0 +1,39 @@
+Line #1:  ConfigPath ....\merak\config\                                                   //Full path to the config directory 
+Line #2:  WebPath ....\merak\html\                                                        //Full path to the HTML directory 
+Line #3:       
+Line #4:  LocalServerID                                                                   //Specifies the prefix for all message files 
+Line #5:  RemoteLogonPath \\server\mail;user;password | \\server\logs;user;password | ... //Specifies remote paths and their username and password to logon with 
+Line #6:  SpamPath ....\merak\spam\                                                       //Full path to the spam directory 
+Line #7:  GroupwarePath ....\merak\calendar\                                              //Full path to the groupware directory 
+Line #8:  OutgoingPath ....\merak\mail\_outgoing\                                         //Full path to the mail outgoing directory 
+Line #9:  OutgoingRetryPath ....\merak\mail\_outgoing\retry\                              //Full path to the mail retry directory 
+Line #10: IPBinding (Server Binding "|" Outgoing Binding) 127.0.0.1;192.168.0.1           //The IPs you want the server to bind to 
+Line #11: HostName mail.domain.com                                                        //The hostname you want the server to use in communication with other servers 
+Line #12: LicenseFile license.key                                                         //Full filename to local license file 
+Line #13: IncomingPath ....\merak\mail\_incoming\                                         //Full path to the mail incoming directory 
+Line #14: SlaveServer "0" / "1"                                                           //Specifies if the server has a role of slave. 
+Line #15: MasterHost 192.168.0.2"                                                         //Specifies the master host. 
+Line #16: SlaveHosts 192.168.0.3;192.168.0.4                                              //Specifies the list of slave hosts. 
+
+
+
+-- example linux
+/mnt/data/config/
+/mnt/data/html/
+
+01
+
+/mnt/data/spam/
+/mnt/data/calendar/
+/opt/icewarp/mailqueues/_outgoing/
+/opt/icewarp/mailqueues/_outgoing/retry/
+
+
+
+/opt/icewarp/mailqueues/_incoming/
+0
+
+
+-- end example linux
+
+
