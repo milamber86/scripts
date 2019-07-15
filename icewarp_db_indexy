@@ -1,0 +1,194 @@
+-- acc:Aliases - zrusit adomain+aalias, pridat sdruzeny unique nad A_Domain, A_Alias
+use accounts;
+CREATE TABLE `Aliases2` like `Aliases`;
+ALTER TABLE `Aliases2` DROP KEY `adomain`;
+ALTER TABLE `Aliases2` DROP KEY `aalias`;
+ALTER TABLE `Aliases2` ADD UNIQUE KEY `aliasdomain` (`A_Domain`,`A_Alias`);
+insert ignore Aliases2 select * from Aliases;
+rename table Aliases to Aliases_dup;rename table Aliases2 to Aliases;
+drop table Aliases_dup;
+
+-- asp:Senders - zrusit iSndOwner+iSndEmail, pridat sdruzeny unique nad SndOwner, SndEmail
+use antispam;
+CREATE TABLE `Senders2` like `Senders`;
+ALTER TABLE Senders2 DROP KEY `iSndOwner`;
+ALTER TABLE Senders2 DROP KEY `iSndEmail`;
+ALTER TABLE `Senders2` DROP KEY `iSndOwnerEmail`;
+ALTER TABLE `Senders2` ADD UNIQUE KEY `iSndOwnerEmail` (`SndOwner`,`SndEmail`);
+insert ignore Senders2 select * from Senders;
+rename table Senders to Senders_dup;rename table Senders2 to Senders;
+drop table Senders_dup;
+
+-- dc:accountcachejournals - tam budeme muset pridat umely klic
+use dircache;
+alter table AccountCacheJournals add record_id int(11) primary key NOT NULL AUTO_INCREMENT;
+
+-- gw:ContactItem - predelat ContactITMIndex na unique/primary
+use groupware;
+CREATE TABLE `ContactItem2` like `ContactItem`;
+ALTER TABLE `ContactItem2` DROP KEY `ContactITMIndex`;
+ALTER TABLE `ContactItem2` ADD PRIMARY KEY `ContactITMIndex` (`ITM_ID`);
+insert ignore ContactItem2 select * from ContactItem;
+rename table ContactItem to ContactItem_dup;rename table ContactItem2 to ContactItem;
+drop table ContactItem_dup;
+
+-- gw:ContactLocation - predelat ContactLocationItemIndex na unique (nechat oba sloupecky)
+CREATE TABLE `ContactLocation2` like `ContactLocation`;
+ALTER TABLE `ContactLocation2` DROP KEY `ContactLocationItemIndex`;
+ALTER TABLE `ContactLocation2` ADD UNIQUE KEY `ContactLocationItemIndex` (`LCT_ID`,`LCTITM_ID`);
+insert ignore ContactLocation2 select * from ContactLocation;
+rename table ContactLocation to ContactLocation_dup;rename table ContactLocation2 to ContactLocation;
+drop table ContactLocation_dup;
+
+-- gw:EventContact - predelat ContactIndex na unique (nechat oba sloupecky)
+CREATE TABLE `EventContact2` like `EventContact`;
+ALTER TABLE `EventContact2` DROP KEY `ContactIndex`;
+ALTER TABLE `EventContact2` ADD UNIQUE KEY `ContactIndex` (`CNT_ID`,`CNTEVN_ID`);
+insert ignore EventContact2 select * from EventContact;
+rename table EventContact to EventContact_dup;rename table EventContact2 to EventContact;
+drop table EventContact_dup;
+
+-- gw:EventException - predelat EXPIndex na unique/primary
+CREATE TABLE `EventException2` like `EventException`;
+ALTER TABLE `EventException2` DROP KEY `EXPIndex`;
+ALTER TABLE `EventException2` ADD PRIMARY KEY `EXPIndex` (`EXP_ID`);
+insert ignore EventException2 select * from EventException;
+rename table EventException to EventException_dup;rename table EventException2 to EventException;
+drop table EventException_dup;
+
+-- gw:EventGroup - predelat GroupOwnerIndex na unique (nechat oba sloupecky)
+CREATE TABLE `EventGroup2` like `EventGroup`;
+ALTER TABLE `EventGroup2` DROP KEY `GroupOwnerIndex`;
+ALTER TABLE `EventGroup2` ADD UNIQUE KEY `GroupOwnerIndex` (`GRP_ID`,`GRPOWN_ID`);
+insert ignore EventGroup2 select * from EventGroup;
+rename table EventGroup to EventGroup_dup;rename table EventGroup2 to EventGroup;
+drop table EventGroup_dup;
+
+-- gw:EventHoliday - zrusit HolidayIndex, pridat sdruzeny unique nad HOLOWN_ID, HolHolidayID
+CREATE TABLE `EventHoliday2` like `EventHoliday`;
+ALTER TABLE `EventHoliday2` DROP KEY `HolidayIndex`;
+ALTER TABLE `EventHoliday2` ADD UNIQUE KEY `HolidayIndex` (`HOLOWN_ID`,`HolHolidayID`);
+insert ignore EventHoliday2 select * from EventHoliday;
+rename table EventHoliday to EventHoliday_dup;rename table EventHoliday2 to EventHoliday;
+drop table EventHoliday_dup;
+
+-- gw:EventOwner - predelat OwnerIndex na unique/primary
+CREATE TABLE `EventOwner2` like `EventOwner`;
+ALTER TABLE `EventOwner2` DROP KEY `OwnerIndex`;
+ALTER TABLE `EventOwner2` ADD PRIMARY KEY `OwnerIndex` (`OWN_ID`);
+insert ignore EventOwner2 select * from EventOwner;
+rename table EventOwner to EventOwner_dup;rename table EventOwner2 to EventOwner;
+drop table EventOwner_dup;
+
+-- gw:EventRecurrence - predelat RCRIndex na unique/primary
+CREATE TABLE `EventRecurrence2` like `EventRecurrence`;
+ALTER TABLE `EventRecurrence2` DROP KEY `RCRIndex`;
+ALTER TABLE `EventRecurrence2` ADD PRIMARY KEY `RCRIndex` (`RCR_ID`);
+insert ignore EventRecurrence2 select * from EventRecurrence;
+rename table EventRecurrence to EventRecurrence_dup;rename table EventRecurrence2 to EventRecurrence;
+drop table EventRecurrence_dup;
+
+-- gw:EventReminder - predelat RMNIndex na unique (nechat oba sloupecky)
+CREATE TABLE `EventReminder2` like `EventReminder`;
+ALTER TABLE `EventReminder2` DROP KEY `RMNIndex`;
+ALTER TABLE `EventReminder2` ADD UNIQUE KEY `RMNIndex` (`RMN_ID`,`RMNEVN_ID`);
+insert ignore EventReminder2 select * from EventReminder;
+rename table EventReminder to EventReminder_dup;rename table EventReminder2 to EventReminder;
+drop table EventReminder_dup;
+
+-- gw:FolderRights - bud udelat umely, nebo zrusit FolderRightGroupEmailIndex a predelat na sdruzeny unique nad FRTGRP_ID, FrtEmail, FRTFDR_ID
+CREATE TABLE `FolderRights2` like `FolderRights`;
+ALTER TABLE `FolderRights2` DROP KEY `FolderRightGroupEmailIndex`;
+ALTER TABLE `FolderRights2` ADD UNIQUE KEY `FolderRightGroupEmailIndex` (`FRTGRP_ID`,`FrtEmail`,`FRTFDR_ID`);
+insert ignore FolderRights2 select * from FolderRights;
+rename table FolderRights to FolderRights_dup;rename table FolderRights2 to FolderRights;
+drop table FolderRights_dup;
+
+-- gw:Folders - zrusit FolderIDIndex, pridat sdruzeny unique nad FDRGRP_ID, FDR_ID
+CREATE TABLE `Folders2` like `Folders`;
+ALTER TABLE `Folders2` DROP KEY `FolderIDIndex`;
+ALTER TABLE `Folders2` ADD UNIQUE KEY `FolderIDIndex` (`FDR_ID`,`FDRGRP_ID`);
+insert ignore Folders2 select * from Folders;
+rename table Folders to Folders_dup;rename table Folders2 to Folders;
+drop table Folders_dup;
+
+-- gw:GroupChatUnread - predelat GroupChatUnreadIndex na unique (nechat vsechny tri sloupecky)
+CREATE TABLE `GroupChatUnread2` like `GroupChatUnread`;
+ALTER TABLE `GroupChatUnread2` DROP KEY `GroupChatUnreadIndex`;
+ALTER TABLE `GroupChatUnread2` ADD UNIQUE KEY `GroupChatUnreadIndex` (`GCUOWN_ID`,`GCUGRP_ID`,`GCUFDR_ID`);
+insert ignore GroupChatUnread2 select * from GroupChatUnread;
+rename table GroupChatUnread to GroupChatUnread_dup;rename table GroupChatUnread2 to GroupChatUnread;
+drop table GroupChatUnread_dup;
+
+-- gw:ItemAttr - predelat AttrIDIndex na unique/primary
+CREATE TABLE `ItemAttr2` like `ItemAttr`;
+ALTER TABLE `ItemAttr2` DROP KEY `AttrIDIndex`;
+ALTER TABLE `ItemAttr2` ADD UNIQUE KEY `AttrIDIndex` (`ATR_ID`);
+insert ignore ItemAttr2 select * from ItemAttr;
+rename table ItemAttr to ItemAttr_dup;rename table ItemAttr2 to ItemAttr;
+drop table ItemAttr_dup;
+
+-- gw:ItemAttrData - zrusit AttrDataIndex, pridat sdruzeny unique nad DataATR_ID, DataIndex
+CREATE TABLE `ItemAttrData2` like `ItemAttrData`;
+ALTER TABLE `ItemAttrData2` DROP KEY `AttrDataIndex`;
+ALTER TABLE `ItemAttrData2` ADD UNIQUE KEY `AttrDataIndex` (`DataATR_ID`,`DataIndex`);
+insert ignore ItemAttrData2 select * from ItemAttrData;
+rename table ItemAttrData to ItemAttrData_dup;rename table ItemAttrData2 to ItemAttrData;
+drop table ItemAttrData_dup;
+
+-- gw:TagLinks - pridat unique/primary nad sloupeckem TGL_ID
+CREATE TABLE `TagLinks2` like `TagLinks`;
+ALTER TABLE `TagLinks2` ADD UNIQUE KEY `TglIdIndex` (`TGL_ID`);
+insert ignore TagLinks2 select * from TagLinks;
+rename table TagLinks to TagLinks_dup;rename table TagLinks2 to TagLinks;
+drop table TagLinks_dup;
+
+-- gw:Tags - predelat TagIDIndex na unique (nechat oba sloupecky)
+CREATE TABLE `Tags2` like `Tags`;
+ALTER TABLE `Tags2` DROP KEY `TagIDIndex`;
+ALTER TABLE `Tags2` ADD UNIQUE KEY `TagIDIndex` (`TAGGRP_ID`,`TAG_ID`);
+insert ignore Tags2 select * from Tags;
+rename table Tags to Tags_dup;rename table Tags2 to Tags;
+drop table Tags_dup;
+
+-- gw:Tickets - predelat TicketIDIndex na unique/primary
+CREATE TABLE `Tickets2` like `Tickets`;
+ALTER TABLE `Tickets2` DROP KEY `TicketIDIndex`;
+ALTER TABLE `Tickets2` ADD UNIQUE KEY `TicketIDIndex` (`TCK_ID`);
+insert ignore Tickets2 select * from Tickets;
+rename table Tickets to Tickets_dup;rename table Tickets2 to Tickets;
+drop table Tickets_dup;
+
+-- eas:dummy_folders - zrusit dummy_folders_index, pridat sdruzeny unique nad device_id, folder_id
+use eas;
+CREATE TABLE `dummy_folders2` like `dummy_folders`;
+ALTER TABLE `dummy_folders2` DROP KEY `dummy_folders_index`;
+ALTER TABLE `dummy_folders2` ADD UNIQUE KEY `dummy_folders_index` (`device_id`,`folder_id`);
+insert ignore dummy_folders2 select * from dummy_folders;
+rename table dummy_folders to dummy_folders_dup;rename table dummy_folders2 to dummy_folders;
+drop table dummy_folders_dup;
+
+-- eas:Folders - zrusit folders_index, pridat sdruzeny unique nad device_id, folder_id
+CREATE TABLE `folders2` like folders;
+ALTER TABLE `folders2` DROP KEY `folders_index`;
+ALTER TABLE `folders2` ADD UNIQUE KEY `folders_index` (`device_id`,`folder_id`);
+insert ignore folders2 select * from folders;
+rename table folders to folders_dup;rename table folders2 to folders;
+drop table folders_dup;
+
+-- eas:items - 
+alter table items drop `record_id`;
+CREATE TABLE `items2` like items;
+ALTER TABLE `items2` DROP KEY `items_index`;
+ALTER TABLE `items2` ADD UNIQUE KEY `items_index` (`device_id`,`folder_id`,`item_id`);
+insert ignore items2 select * from items;
+rename table items to items_dup;rename table items2 to items;
+drop table items_dup;
+
+-- eas:push - zrusit push_index, pridat sdruzeny unique nad device_id, folder_id
+CREATE TABLE `push2` like `push`;
+ALTER TABLE `push2` DROP KEY `push_index`;
+ALTER TABLE `push2` ADD UNIQUE KEY `push_index` (`device_id`,`folder_id`);
+insert ignore push2 select * from push;
+rename table push to push_dup;rename table push2 to push;
+drop table push_dup;
