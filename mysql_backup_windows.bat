@@ -12,14 +12,14 @@
  if not exist %backupDir% mkdir %backupDir%
  if not exist %rtDir% mkdir %rtDir%
 
- :: get date
+ :: get date ( on windows in cs lang, change delim from / to ., ie.: for /F "tokens=2-4 delims=. )
  for /F "tokens=2-4 delims=/ " %%i in ('date /t') do (
       set yy=%%i
       set mon=%%j
       set dd=%%k
  )
 
- :: get time
+ :: get time 
  for /F "tokens=5-8 delims=:. " %%i in ('echo.^| time ^| find "current" ') do (
       set hh=%%i
       set min=%%j
