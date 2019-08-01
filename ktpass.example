@@ -1,0 +1,4 @@
+ktpass /out http.keytab /princ HTTP/email.stavinvest.cz@stavinvest.local /mapuser iwssohttp /crypto all /ptype KRB5_NT_PRINCIPAL /pass Email1234 /target sidc.stavinvest.local
+ktpass /out imap.keytab /princ imap/email.stavinvest.cz@stavinvest.local /mapuser iwssoimap /crypto all /ptype KRB5_NT_PRINCIPAL /pass Email1234 /target sidc.stavinvest.local
+ktpass /out xmpp.keytab /princ xmpp/email.stavinvest.cz@stavinvest.local /mapuser iwssoxmpp /crypto all /ptype KRB5_NT_PRINCIPAL /pass Email1234 /target sidc.stavinvest.local
+ktpass /out smtp.keytab /princ smtp/email.stavinvest.cz@stavinvest.local /mapuser iwssosmtp /crypto all /ptype KRB5_NT_PRINCIPAL /pass Email1234 /target sidc.stavinvest.local
