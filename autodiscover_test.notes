@@ -1,0 +1,10 @@
+curl -ikL -verbose --basic --user "user:pass" -XPOST -d @req.xml --header "Content-Type:text/xml" https://mail.icewarp.cz:443/autodiscover/autodiscover.xml
+
+
+req.xml:
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/requestschema/2006">
+  <Request>
+    <EMailAddress>email_address</EMailAddress>
+    <AcceptableResponseSchema>http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a</AcceptableResponseSchema>
+  </Request>
+</Autodiscover>
