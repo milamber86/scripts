@@ -15,7 +15,7 @@ SlaveIO="$(echo "show slave status\G" | mysql | grep "Slave_IO_Running:" | awk '
 SlaveSQL="$(echo "show slave status\G" | mysql | grep "Slave_SQL_Running:" | awk '{print $2}')"
 declare -i SlaveBehind=$(echo "show slave status\G" | mysql | grep "Seconds_Behind_Master:" | awk '{print $2}');
 # run backup
-if [[ ( "${SlaveIO}" = "Yes" && "${SlaveSQL}" = "Yes" && "${SlaveBehind}" -le 120 ) ]]
+if [[ ( "${SlaveIO}" = "Yes" && "${SlaveSQL}" = "Yes" && "${SlaveBehind}" -le 300 ) ]]
 # if slave ok, take local backup and reset alert on monitoring
 	then
 	  zabbix_sender -z ${monitoring} -s "$(hostname)" -k SlaveLagAlert -o 0 > /dev/null 2>&1
