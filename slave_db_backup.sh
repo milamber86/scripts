@@ -27,7 +27,7 @@ if [[ ( "${SlaveIO}" = "Yes" && "${SlaveSQL}" = "Yes" && "${SlaveBehind}" -le 12
 fi
 # send backup result to monitoring
 	  result="$(grep -o " completed OK" ${TMPFILE})";
-          rm -f ${TMPFILE};
+          mv ${TMPFILE} ${backuppath}/bck_mysql`date +%Y%m%d-%H%M`.log
 if [[ "${result}" = " completed OK" ]]
 	then
 # if last backup OK, remove older backups
