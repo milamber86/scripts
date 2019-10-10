@@ -13,7 +13,7 @@ if [ -z "$MY_PATH" ] ; then
   exit 1  # fail
 fi
 #
-ldapsearch -x -h 10.234.134.30 -D "CN=LDAP IceWarp,OU=SYS Users,OU=SharedServices,DC=MyOVB,DC=com" -y <(cat "${MY_PATH}"/.pass.txt | tr -d '\n\r') -b "OU=RO,OU=Test,DC=MyOVB,DC=com" -s sub '(&(objectClass=user)(mail=*@uat.ovb.eu)(!(UserAccountControl:1.2.840.113556.1.4.803:=2))(memberof=CN=ro_icewarp_full_users_uat,OU=UserGroups,OU=RO,OU=Test,DC=MyOVB,DC=com))' mail -E pr=1000/noprompt > /root/full_usr.txt
+ldapsearch -x -h 10.234.134.30 -D "CN=LDAP,OU=Users,OU=Services,DC=MyTEST,DC=com" -y <(cat "${MY_PATH}"/.pass.txt | tr -d '\n\r') -b "OU=RO,OU=Test,DC=MyTEST,DC=com" -s sub '(&(objectClass=user)(mail=*@sub.domain.com)(!(UserAccountControl:1.2.840.113556.1.4.803:=2))(memberof=CN=ro_icewarp_full_users_uat,OU=UserGroups,OU=RO,OU=Test,DC=MyTEST,DC=com))' mail -E pr=1000/noprompt > /root/full_usr.txt
 for USR in $(grep "^mail: " "${MY_PATH}"/full_usr.txt | sed -r 's|^mail: ||')
   do
     STR=`grep ${USR} "${MY_PATH}"/full_usr_done.txt`
@@ -23,7 +23,7 @@ for USR in $(grep "^mail: " "${MY_PATH}"/full_usr.txt | sed -r 's|^mail: ||')
       echo "${USR}" >> "${MY_PATH}"/full_usr_done.txt
     fi
   done
-ldapsearch -x -h 10.234.134.30 -D "CN=LDAP IceWarp,OU=SYS Users,OU=SharedServices,DC=MyOVB,DC=com" -y <(cat "${MY_PATH}"/.pass.txt | tr -d '\n\r') -b "OU=RO,OU=Test,DC=MyOVB,DC=com" -s sub '(&(objectClass=user)(mail=*@uat.ovb.eu)(!(UserAccountControl:1.2.840.113556.1.4.803:=2))(memberof=CN=ro_icewarp_light_users_uat,OU=UserGroups,OU=RO,OU=Test,DC=MyOVB,DC=com))' mail -E pr=1000/noprompt > /root/light_usr.txt
+ldapsearch -x -h 10.234.134.30 -D "CN=LDAP,OU=Users,OU=Services,DC=MyTEST,DC=com" -y <(cat "${MY_PATH}"/.pass.txt | tr -d '\n\r') -b "OU=RO,OU=Test,DC=MyTEST,DC=com" -s sub '(&(objectClass=user)(mail=*@sub.domain.com)(!(UserAccountControl:1.2.840.113556.1.4.803:=2))(memberof=CN=ro_icewarp_light_users_uat,OU=UserGroups,OU=RO,OU=Test,DC=MyTEST,DC=com))' mail -E pr=1000/noprompt > /root/light_usr.txt
 for USR in $(grep "^mail: " "${MY_PATH}"/light_usr.txt | sed -r 's|^mail: ||')
   do
     STR=`grep ${USR} "${MY_PATH}"/light_usr_done.txt`
