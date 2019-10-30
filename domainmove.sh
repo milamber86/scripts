@@ -29,9 +29,9 @@ mkdir -p ${targetpath}
                              gwownid=$(echo -e "use ${grwdbname};SELECT OWN_ID FROM EventOwner WHERE OWN_Email = \x27${email}\x27;" | mysql | grep -v OWN_ID | awk '{print $1}');
                              newemail=$(echo -e "${email}" | sed -r "s|${sourcedom}|${targetdom}|");
                              echo -e "use ${grwdbname};UPDATE EventOwner SET OWN_Email = \x27${newemail}\x27 WHERE OWN_ID = \x27${gwownid}\x27" | mysql
-			     			 newmpath=$(/opt/icewarp/tool.sh export account "${newemail}" u_mailboxpath | awk -F ',' '{print $2}' | sed -r "s|${sourcedom}|${targetdom}|")
-							 /opt/icewarp/tool.sh set account "${newemail}" u_mailboxpath "${newmpath}"
-							 sed -i -r "s|${sourcedom}|${targetdom}|g" "${to}/~webmail/settings.xml"
+			     newmpath=$(/opt/icewarp/tool.sh export account "${newemail}" u_mailboxpath | awk -F ',' '{print $2}' | sed -r "s|${sourcedom}|${targetdom}|")
+			     /opt/icewarp/tool.sh set account "${newemail}" u_mailboxpath "${newmpath}"
+			     sed -i -r "s|${sourcedom}|${targetdom}|g" "${to}/~webmail/settings.xml"
                        	    fi
         done
 } < ${userlist}
