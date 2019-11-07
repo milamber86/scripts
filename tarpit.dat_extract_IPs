@@ -1,0 +1,1 @@
+tr -cd '\11\12\15\40-\176' < /opt/icewarp/config/tarpit.dat > text_tarpit.dat;egrep -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" text_tarpit.dat > IPs_tarpit.dat;cat IPs_tarpit.dat
