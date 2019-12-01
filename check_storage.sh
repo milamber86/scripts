@@ -9,6 +9,7 @@ echo $$ > "${mypidfile}"
 for pid in $(pgrep -f check_storage.sh); do
 	if [ ${pid} != $$ ]; then
 	 echo "$(date) - Another check already running, killing PID ${pid}, sending alert to ${monitoring}, killing IceWarp services." > ${logfile} 2>&1
+	 zabbix_sender -z ${monitoring} -s "$(hostname)" -k StorageAlert -o 1 > ${logfile} 2>&1
 	 kill -9 ${pid}
     	 /opt/icewarp/icewarpd.sh --stop all >> ${logfile}
 	fi
