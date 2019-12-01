@@ -10,7 +10,7 @@ for pid in $(pgrep -f check_storage.sh); do
 	if [ ${pid} != $$ ]; then
 	 echo "$(date) - Another check already running, killing PID ${pid}, sending alert to ${monitoring}, killing IceWarp services." > ${logfile} 2>&1
 	 kill -9 ${pid}
-#    	 /opt/icewarp/icewarpd.sh --stop all >> ${logfile}
+    	 /opt/icewarp/icewarpd.sh --stop all >> ${logfile}
 	fi
 done
 if [ -f "${storagepath}"/storage.dat ]
