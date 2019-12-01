@@ -20,6 +20,6 @@ if [ -f "${storagepath}"/storage.dat ]
 	 zabbix_sender -z ${monitoring} -s "$(hostname)" -k StorageAlert -o 1 > ${logfile} 2>&1
 	 /opt/icewarp/icewarpd.sh --stop all >>	${logfile}
 	 echo "$(date) - FAIL" >> ${logfile}
-   exit 1
+         exit 1
 	fi
 exit 0
