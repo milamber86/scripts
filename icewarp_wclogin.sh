@@ -1,10 +1,7 @@
 #!/bin/bash
-# IceWarp server IP/host
-iwserver="127.0.0.1"
-# email address
-email="user@example.loc"
-# password
-pass="password"
+iwserver="server.example.com"     # IceWarp server IP/host
+email="user@example.com"          # email address
+pass="passwordexample"            # password
 
 rawurlencode() {
   local string="${1}"
@@ -23,21 +20,28 @@ rawurlencode() {
   echo "${encoded}"
 }
 
-
-atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
-
 # get auth token
-wcatoken="$(curl -ik --data-binary "${atoken_request}" "http://${iwserver}/icewarpapi/" |egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
+wcatoken="$(curl -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
 
 # get phpsessid
-wcphpsessid="$(curl -ik "http://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+wcphpsessid="$(curl -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 
 # auth wc session
-wcsid="$(curl -ik --data-binary "<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>" "http://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
+wcsid="$(curl -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
 
 # refresh folders
-curl -ik --data-binary "<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>" "http://${iwserver}/webmail/server/webmail.php"
+refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
+response="$(curl -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
 
+if [[ "${response}" =~ "INBOX" ]];
+        then
+         echo "INBOX folder found, OK"
+        else
+         echo "Alert! INBOX not found in folder refresh response."
+fi
 
 # session logout
-curl -ik --data-binary "<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>" "http://${iwserver}/webmail/server/webmail.php"
+logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
+curl -ik --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php"
