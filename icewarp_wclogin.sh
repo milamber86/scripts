@@ -38,5 +38,6 @@ wcsid="$(curl -ik --data-binary "<iq type=\"set\"><query xmlns=\"webmail:iq:auth
 # refresh folders
 curl -ik --data-binary "<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>" "http://${iwserver}/webmail/server/webmail.php"
 
+
 # session logout
 curl -ik --data-binary "<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>" "http://${iwserver}/webmail/server/webmail.php"
