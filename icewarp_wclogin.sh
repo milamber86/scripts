@@ -1,9 +1,9 @@
 #!/bin/bash
-iwserver="10.1.1.10";				     				# IceWarp server IP/host
+iwserver="10.1.1.10";				# IceWarp server IP/host
 email="wczabbixmon@icewarp.loc";    		# email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="r4g53eR-4g54se6";	        				# password
-declare -i guest=1;											# test account type, 0 - standard user account, 1 - teamchat guest account
-ctimeout="10";          			      		# curl connection timeout in seconds
+pass="r4g53eR-4g54se6";	        		# password
+declare -i guest=1;				# test account type, 0 - standard user account, 1 - teamchat guest account
+ctimeout="10";          			# curl connection timeout in seconds
 
 # urlencode string function
 rawurlencode() {
