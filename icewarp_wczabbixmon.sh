@@ -1,5 +1,5 @@
 #!/bin/bash
-start=`date +%s`
+start=`date +%s%N | cut -b1-13`
 iwserver="127.0.0.1";				     							# IceWarp server IP/host
 email="user@example.loc";	      									# email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="somepass";	        									# password
@@ -110,7 +110,7 @@ fi
 logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl --connect-timeout ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php"
 
-end=`date +%s`
+end=`date +%s%N | cut -b1-13`
 runtime=$((end-start))
 echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginExecTime -o ${runtime} --- " >> ${logpath}/${logfile}
 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginExecTime -o ${runtime} >> ${logpath}/${logfile} 2>&1
