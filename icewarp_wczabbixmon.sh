@@ -23,16 +23,14 @@ mypidfile=/var/run/wczabbixmon.sh.pid
 # Ensure PID file is removed on program exit.
 trap "rm -f -- '${mypidfile}'" EXIT
 
-# Create a file with current PID to indicate that process is running.
-echo $$ > "${mypidfile}"
-
-# Check for duplicate process running, if so, exit with error.
-for pid in $(pgrep -f $0); do
-    if [ ${pid} != $$ ]; then
-        echo "[$(date)] : $0 : Process is already running with PID ${pid}, exiting 1." >> ${logpath}/${logfile} 2>&1
-        exit 1
-    fi
-done
+# Create a file with current PID to indicate that process is running. If another pidfile already exists, exit with 1
+if [ -e ${mypidfile} ]
+	then
+         echo "Script pidfile exists with pid `cat ${mypidfile}`, exiting 1" >> ${logpath}/${logfile}
+         exit 1
+        else
+         echo $$ > "${mypidfile}"
+fi
 
 # urlencode string function
 rawurlencode() {
