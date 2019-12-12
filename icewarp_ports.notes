@@ -1,0 +1,68 @@
+Following are a list of ports required by all of IceWarp services.
+The incoming ports below should be opened on your firewall for the IceWarp server and all server
+to WAN connections should be open and not limited.
+
+For security reasons you should only open the ports for the services you require access too.
+If you do not use a particular service then do not open the port.
+
+SMTP
+TCP 465 (SSL)
+TCP 25
+TCP 587
+TCP 366
+
+POP3
+TCP 995 (SSL)
+TCP 110
+
+IMAP
+TCP 993 (SSL)
+TCP 143
+
+HTTP
+TCP 443 (SSL)
+TCP 80
+TCP 32000
+TCP 32001
+
+FTP
+TCP 990 (SSL)
+TCP 21
+TCP 4048 ~ 5191 (FTP Passive Port Range Customizable from within FTP Service)
+
+GROUPWARE PORT
+TCP 5229 (Only Required for External to Server GW API Connections, eg. Outlook Sync Clients)
+
+INSTANT MESSAGING
+TCP 5223 (SSL)
+TCP 5222
+TCP 5269
+
+VOIP/SIP
+TCP 5061 (SSL)
+TCP 5060
+UDP 5060
+UDP 10000 ~ 10255 (SIP RTP Port Range Customizable from within SIP Service)
+
+LDAP
+TCP 636 (SSL)
+TCP 389
+
+SOCKS (TCP)
+TCP 1080
+
+MINGER
+TCP 4070 (SSL)
+UDP 4069
+
+SNMP
+UDP 161
+
+ANTI-SPAM LIVE
+The following Anti-Spam LIVE ports are used on the localhost server only and should not be blocked or used by other services.
+
+TCP 8088 (Customizable under [HttpServer] in <installDirectory>/spam/commtouch/ctasd.conf)
+TCP 8080 (Required if Use IP Reputation is enabled)
+
+RAZOR2 (Anti-Spam Option)
+TCP 2703
