@@ -1,19 +1,21 @@
 #!/bin/bash
+start=`date +%s`
 iwserver="127.0.0.1";				     							# IceWarp server IP/host
 email="user@example.loc";	      									# email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="somepass";	        									# password
 declare -i guest=1;											# test account type, 0 - standard user account, 1 - teamchat guest account
 ctimeout="10";          			         						# curl connection timeout in seconds
-monitoring="zabbix_ip";											# zabbix server IP/host
-logpath="/root/scripts/logs/";										# script logpath
+monitoring="zabbix_IP";											# zabbix server IP/host
+logpath="/path/to/logs/";										# script logpath
 mkdir -p "${logpath}"
-logfile="`date +%Y%m%d`wcmon.log";									# script logfile
+logfile="`date +%Y%m%d`-wcmon.log";									# script logfile
 logretention=16;											# how many days to keep the logs
 
-trap "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logfile} 2>&1" ERR
+echo "" >> ${logpath}/${logfile}
+echo "[$(date)] - WC login check start." >> ${logpath}/${logfile}
+trap "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logpath}/${logfile} 2>&1" ERR
 
-find ${logpath} -type f -name "*wcmon.log" -mtime +${logretention} -exec rm -fv {} \; >> ${logfile} 2>&1 # delete logs older than ${logretention}
-
+find ${logpath} -type f -name "*wcmon.log" -mtime +${logretention} -exec rm -fv {} \; >> ${logpath}/${logfile} 2>&1 # delete logs older than ${logretention}
 
 # Create PID file
 mypidfile=/var/run/wczabbixmon.sh.pid
@@ -27,7 +29,7 @@ echo $$ > "${mypidfile}"
 # Check for duplicate process running, if so, exit with error.
 for pid in $(pgrep -f $0); do
     if [ ${pid} != $$ ]; then
-        echo "[$(date)] : $0 : Process is already running with PID ${pid}, exiting 1." >> ${logfile} 2>&1
+        echo "[$(date)] : $0 : Process is already running with PID ${pid}, exiting 1." >> ${logpath}/${logfile} 2>&1
         exit 1
     fi
 done
@@ -80,24 +82,28 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
 	 response="$(curl --connect-timeout ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
 	 if [[ "${response}" =~ "INBOX" ]];
          	then
-         	 echo "INBOX folder found, OK" >> ${logfile}
-		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 >> ${logfile} 2>&1
+         	 echo "INBOX folder found, OK" >> ${logpath}/${logfile}
+		 echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 --- " >> ${logpath}/${logfile}
+		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 >> ${logpath}/${logfile} 2>&1
         	else
-         	 echo "Alert! INBOX not found in folder refresh response." >> ${logfile}
-		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logfile} 2>&1
+         	 echo "Alert! INBOX not found in folder refresh response." >> ${logpath}/${logfile}
+		 echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 --- " >> ${logpath}/${logfile}
+		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logpath}/${logfile} 2>&1
 	 fi
 	 # refresh folders standard account end
 	else
 	 # refresh folders teamchat guest account start
 	 refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${guestaccemail}\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${guestaccemail}\"/></query></iq>"
-	 response="$(curl --connect-timeout ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL")"
+	 response="$(curl --connect-timeout ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
 	 if [[ "${response}" =~ "INHERITED_ACL" ]];
          	then
-         	 echo "Test pattern found in response, OK" >> ${logfile}
-		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 >> ${logfile} 2>&1
+         	 echo "Test pattern found in response, OK" >> ${logpath}/${logfile}
+	 	 echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 --- " >> ${logpath}/${logfile}
+		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 0 >> ${logpath}/${logfile} 2>&1
         	else
-         	 echo "Alert! Test pattern not found in response." >> ${logfile}
-		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logfile} 2>&1
+         	 echo "Alert! Test pattern not found in response." >> ${logpath}/${logfile}
+		 echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 --- " >> ${logpath}/${logfile}
+		 zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginAlert -o 1 >> ${logpath}/${logfile} 2>&1
 	 fi
 	 # refresh folders teamchat guest account end
 fi
@@ -105,3 +111,10 @@ fi
 # session logout
 logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl --connect-timeout ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php"
+
+end=`date +%s`
+runtime=$((end-start))
+echo -n "zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginExecTime -o ${runtime} --- " >> ${logpath}/${logfile}
+zabbix_sender -z ${monitoring} -s "$(hostname)" -k WebclientLoginExecTime -o ${runtime} >> ${logpath}/${logfile} 2>&1
+
+echo "[$(date)] - WC login check end." >> ${logpath}/${logfile}
