@@ -1,5 +1,4 @@
 #!/bin/bash
-start=`date +%s%N | cut -b1-13`
 iwserver="127.0.0.1";				     							# IceWarp server IP/host
 email="user@example.loc";	      									# email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="somepass";	        									# password
@@ -62,6 +61,7 @@ if [[ ${guest} != 0 ]] # generate guestaccount email, test if guest account exis
 	 fi
 fi
 
+start=`date +%s%N | cut -b1-13`
 # get auth token
 atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 wcatoken="$(curl --connect-timeout ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
