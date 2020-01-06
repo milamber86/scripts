@@ -64,21 +64,24 @@ if [ -z "${dbpass}" ]; then dbpass="dbpass not discovered"; fi
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 
-dbcheck=$(/usr/bin/mysql -u ${accdbuser} -p${dbpass} -h ${dbhost} -P ${dbport} -e 'SHOW DATABASES;' | grep -cw "${accdbname}\|${grwdbname}\|${aspdbname}\|${dcdbname}\|${easdbname}\|${wcdbname}")
-log "Starting DB backup."
-if [[ "${dbcheck}" == 3 ]]
-then # generic_cloud ( DBUIWC*, DBUIWC*EAS, DBUIWC*WC)
-/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_asp_grw_dc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
-/usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${backuppath}/bck_db_eas_${easdbname}`date +%Y%m%d-%H%M`.sql.gz &
-/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${backuppath}/bck_db_wc_${wcdbname}`date +%Y%m%d-%H%M`.sql.gz &
-else # non-generic cloud ( other db name settings )
+#dbcheck=$(/usr/bin/mysql -u ${accdbuser} -p${dbpass} -h ${dbhost} -P ${dbport} -e 'SHOW DATABASES;' | grep -cw "${accdbname}\|${grwdbname}\|${aspdbname}\|${dcdbname}\|${easdbname}\|${wcdbname}")
+#log "Starting DB backup."
+#if [[ "${dbcheck}" == 3 ]]
+#then # generic_cloud ( DBUIWC*, DBUIWC*EAS, DBUIWC*WC)
+#/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${backuppath}/bck_db_asp_${aspdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${backuppath}/bck_db_grw_${grwdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${backuppath}/bck_db_dc_${dcdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#/usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${backuppath}/bck_db_eas_${easdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${backuppath}/bck_db_wc_${wcdbname}`date +%Y%m%d-%H%M`.sql.gz &
+#else # non-generic cloud ( other db name settings )
 /usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${backuppath}/bck_db_acc_${accdbname}`date +%Y%m%d-%H%M`.sql.gz &
 /usr/bin/mysqldump --single-transaction -u ${aspdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${backuppath}/bck_db_asp_${aspdbname}`date +%Y%m%d-%H%M`.sql.gz &
 /usr/bin/mysqldump --single-transaction -u ${grwdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${backuppath}/bck_db_grw_${grwdbname}`date +%Y%m%d-%H%M`.sql.gz &
 /usr/bin/mysqldump --single-transaction -u ${dcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${backuppath}/bck_db_dc_${dcdbname}`date +%Y%m%d-%H%M`.sql.gz &
 /usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${backuppath}/bck_db_eas_${easdbname}`date +%Y%m%d-%H%M`.sql.gz &
 /usr/bin/mysqldump --single-transaction -u ${wcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${backuppath}/bck_db_wc_${wcdbname}`date +%Y%m%d-%H%M`.sql.gz &
-fi
+#fi
 log "Finished DB backup."
 wait ${!}
 log "Starting IW config backup."
