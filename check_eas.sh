@@ -1,4 +1,6 @@
 #!/bin/bash
+# requires activesync.txt available at:
+# https://mail.icewarp.cz/webdav/ticket/eJwNy0EOhCAMAMDf9KZbKw1w6NUP.IICZWNMNFE06.,duc9XWF0cCpY4qkGVeb,SfjyQZYJT2CeqgRHNEA7paHDeMfrgwASWfyZS5opa.KO5Lbedz5b79muwCuUQNOKY0gsMHR5N/activesync.txt
 
 STATE_OK=0 
 STATE_WARNING=1 
