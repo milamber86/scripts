@@ -46,10 +46,16 @@ fi
 done
 LOGTO="${LOG_DIR}/${u1}_${LOG_FILE}";
 echo "==== Syncing user $u1 to user $u2 ====" >> ${GENLOG} 2>&1
-imapsync --authmech1 PLAIN --authmech2 PLAIN --authuser1 ${admacc1} --authuser2 ${admacc2} \
-         --host1 "$HOST1" --user1 "$u1" --password1 "${admpass1}" --host2 "$HOST2" --user2 "$u2" --password2 "${admpass2}" \
-         --port1 ${PORT1} --ssl1 --port2 ${PORT2} \
-         --syncinternaldates --addheader --noauthmd5 >> ${LOGTO} 2>&1 &
+# for kerio master auth use this instead:
+# imapsync --host1 "${HOST1}" --authmech1 X-MASTERAUTH --user1 "$u1" --password1 "${admpass1}" \
+#          --host2 "${HOST2}" --authmech2 PLAIN --authuser2 "${admacc2}" --user2 "${u2}" --password2 "${admpass2}" \
+#          --port1 "${PORT1}" --ssl1 --port2 "${PORT2}" \
+#          --syncinternaldates --addheader --noauthmd5 >> "${LOGTO}" 2>&1 &
+
+imapsync --authmech1 PLAIN --authmech2 PLAIN --authuser1 "${admacc1}" --authuser2 "${admacc2}" \
+         --host1 "${HOST1}" --user1 "${u1}" --password1 "${admpass1}" --host2 "${HOST2}" --user2 "${u2}" --password2 "${admpass2}" \
+         --port1 "${PORT1}" --ssl1 --port2 "${PORT2}" \
+         --syncinternaldates --addheader --noauthmd5 >> "${LOGTO}" 2>&1 &
 done
 } < ${USERS_LIST}
 wait
