@@ -1,12 +1,27 @@
 @echo off
-
+ :: db admin user and password
  set dbUser=user
  set dbPassword=pass
+ 
+ :: IceWarp installation dir
  set iwMainDir="C:\Program Files\IceWarp"
+ 
+ :: backup retention temp dir
  set rtDir="C:\Program Files\IceWarp\backup\temp"
+ 
+ :: how many older backups do we keep
+ set rtDays=3
+ 
+ :: directory where to store the backups
  set backupDir="C:\Program Files\IceWarp\backup\dbdump"
+ 
+ :: MySQL data dir
  set mysqlDataDir="C:\Program Files\MariaDB 10.2\data"
+ 
+ :: full path to mysqldump.exe binary
  set mysqldump="C:\Program Files\MariaDB 10.2\bin\mysqldump.exe"
+ 
+ :: full path to 7z.exe binary
  set zip="C:\Program Files\7-Zip\7z.exe"
 
  if not exist %backupDir% mkdir %backupDir%
@@ -51,6 +66,6 @@
  %zip% a -r %backupDir%\%dirName%\cfg.7z %iwMainDir%\config
  %zip% a -r %backupDir%\%dirName%\cal.7z %iwMainDir%\calendar
 
- :: remove backups older than3 days
- ROBOCOPY %backupDir% %rtDir% /mov /minage:3
+ :: remove backups older than 3 days
+ ROBOCOPY %backupDir% %rtDir% /mov /minage:%rtDays%
  del "%rtDir%" /q
