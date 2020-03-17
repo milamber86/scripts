@@ -45,31 +45,31 @@ if [[ -z "${utiltest}" ]]
   /usr/bin/yum -y install epel-release
   /usr/bin/yum -y install perl-HTML-Encoding.noarch
 fi
-which curl
+which curl > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
   log "Installing curl"
   /usr/bin/yum -y install curl
 fi
-which nc
+which nc > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
   log "Installing nc"
   /usr/bin/yum -y install nc
 fi
-which wget
+which wget > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
   log "Installing wget"
   /usr/bin/yum -y install nc
 fi
-which dos2unix
+which dos2unix > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
   log "Installing dos2unix"
   /usr/bin/yum -y install dos2unix
 fi
-which snmpget
+which snmpget > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
   log "Installing net-snmp-utils"
