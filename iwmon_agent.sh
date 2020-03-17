@@ -45,32 +45,32 @@ if [[ -z "${utiltest}" ]]
   /usr/bin/yum -y install epel-release
   /usr/bin/yum -y install perl-HTML-Encoding.noarch
 fi
-utiltest="$(which curl)"
-if [[ "${utiltest}" == *"no curl in"* ]]
+which curl
+if [[ ${?} -ne 0 ]]
   then
   log "Installing curl"
   /usr/bin/yum -y install curl
 fi
-utiltest="$(which nc)"
-if [[ "${utiltest}" == *"no nc in"* ]]
+which nc
+if [[ ${?} -ne 0 ]]
   then
   log "Installing nc"
   /usr/bin/yum -y install nc
 fi
-utiltest="$(which wget)"
-if [[ "${utiltest}" == *"no wget in"* ]]
+which wget
+if [[ ${?} -ne 0 ]]
   then
   log "Installing wget"
   /usr/bin/yum -y install nc
 fi
-utiltest="$(which dos2unix)"
-if [[ "${utiltest}" == *"no dos2unix in"* ]]
+which dos2unix
+if [[ ${?} -ne 0 ]]
   then
   log "Installing dos2unix"
   /usr/bin/yum -y install dos2unix
 fi
-utiltest="$(which snmpget)"
-if [[ "${utiltest}" == *"no snmpget in"* ]]
+which snmpget
+if [[ ${?} -ne 0 ]]
   then
   log "Installing net-snmp-utils"
   /usr/bin/yum -y install net-snmp-utils
@@ -111,7 +111,7 @@ imap) local conn_imap_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.2373
 xmpp) local conn_im_count_server=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count_client=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count=$((${conn_im_count_server} + ${conn_im_count_client}));
-      echo "${conn_xmpp_count}" > ${outputpath}/connstat_xmpp.mon;
+      echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
 ;;
 grw)  local conn_gw_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
