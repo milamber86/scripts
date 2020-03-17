@@ -15,14 +15,13 @@
 #
 #VARS
 HOST="127.0.0.1";
-monitoring="185.119.216.161";
 ctimeout=30;
 EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
-email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="r4g53eR-4g54se6";                                      # password
+email="wczabbixmon@example.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
+pass="Some-Pass-123";                                        # password
 outputpath="/opt/icewarp/var";                               # results output path
 
 #FUNC
@@ -49,14 +48,33 @@ if [[ "${utiltest}" == *"no nc in"* ]]
   /usr/bin/yum -y install nc
 fi
 utiltest="$(which wget)"
-if [[ "${utiltest}" == *"no nc in"* ]]
+if [[ "${utiltest}" == *"no wget in"* ]]
   then
   log "Installing wget"
   /usr/bin/yum -y install nc
 fi
+utiltest="$(which dos2unix)"
+if [[ "${utiltest}" == *"no dos2unix in"* ]]
+  then
+  log "Installing dos2unix"
+  /usr/bin/yum -y install dos2unix
+fi
+utiltest="$(which snmpget)"
+if [[ "${utiltest}" == *"no snmpget in"* ]]
+  then
+  log "Installing net-snmp-utils"
+  /usr/bin/yum -y install net-snmp-utils
+fi
 if [ ! -f ${scriptdir}/activesync.txt ]
   then
   wget https://mail.icewarp.cz/webdav/ticket/eJwNy0EOhCAMAMDf9KZbKw1w6NUP.IICZWNMNFE06.,duc9XWF0cCpY4qkGVeb,SfjyQZYJT2CeqgRHNEA7paHDeMfrgwASWfyZS5opa.KO5Lbedz5b79muwCuUQNOKY0gsMHR5N/activesync.txt
+fi
+utiltest="$(/opt/icewarp/tool.sh get system C_System_Adv_Ext_SNMPServer | awk '{print $2}')"
+if [[ ${utiltest} != "1" ]]
+  then
+  log "Enabling IceWarp SNMP and restarting control service"
+  /opt/icewarp/tool.sh set system C_System_Adv_Ext_SNMPServer 1
+  /opt/icewarp/icewarpd.sh --restart control
 fi
 }
 
