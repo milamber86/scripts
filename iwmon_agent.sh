@@ -162,7 +162,7 @@ esac
 # iw smtp server simple check
 smtpstat()
 {
-SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220")"
+local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220")"
 if [ "${SMTP_RESPONSE}" == "220" ]; then
                         echo "OK" > ${outputpath}/smtpstatus.mon
                           else
@@ -173,7 +173,7 @@ fi
 # iw imap server simple check
 imapstat()
 {
-IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
+local IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
 if [ "${IMAP_RESPONSE}" == "OK" ]; then
                         echo "OK" > ${outputpath}/imapstatus.mon
                           else
@@ -184,7 +184,7 @@ fi
 # iw web server simple check
 wcstat()
 {
-HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
+local HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
                         echo "OK" > ${outputpath}/httpstatus.mon
                           else
@@ -195,7 +195,7 @@ fi
 # iw xmpp server simple check
 xmppstat()
 {
-XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
+local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
 if [ "${XMPP_RESPONSE}" == "xmlns" ]; then
                         echo "OK" > ${outputpath}/xmppcstatus.mon
                           else
@@ -206,7 +206,7 @@ fi
 # iw groupware server simple check
 grwstat()
 {
-GRW_RESPONSE="$(echo "test" | nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
+local GRW_RESPONSE="$(echo "test" | nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
 if [ "${GRW_RESPONSE}" == "greeting" ]; then
                         echo "OK" > ${outputpath}/grwstatus.mon
                           else
@@ -239,10 +239,10 @@ local guest=${1}
 local iwserver="${HOST}"
 if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exists, if not, create one
     then
-     guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
-     guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
+     local guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
+     local guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
      /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin},"
-     result=$?
+     local result=$?
      if [[ ${result} != 0 ]]
          then
          /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
@@ -260,8 +260,8 @@ local wcsid="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-bin
 if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
     then
      # refresh folders standard account start
-     refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
-     response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
+     local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
+     local response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
      if [[ "${response}" =~ "INBOX" ]];
          then
           local freturn=OK
@@ -270,8 +270,8 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      fi # refresh folders standard account end
     else
      # refresh folders teamchat guest account start
-     refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${guestaccemail}\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${guestaccemail}\"/></query></iq>"
-     response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
+     local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${guestaccemail}\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${guestaccemail}\"/></query></iq>"
+     local response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
      if [[ "${response}" =~ "INHERITED_ACL" ]];
          then
           local freturn=OK
@@ -280,7 +280,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      fi # refresh folders teamchat guest account end
 fi
 # session logout
-logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
+local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php"
 local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
@@ -301,15 +301,13 @@ read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last
 declare PASS=$(/opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1
 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 0
-
-aURI="000EASHealthCheck000"
-aTYPE="IceWarpAnnihilator"
+local aURI="000EASHealthCheck000"
+local aTYPE="IceWarpAnnihilator"
 declare -i aSYNCKEY=${aKEY};
-
-start=`date +%s%N | cut -b1-13`
-result=`/usr/bin/curl -k -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
-end=`date +%s%N | cut -b1-13`
-runtime=$((end-start))
+local start=`date +%s%N | cut -b1-13`
+local result=`/usr/bin/curl -k -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
+local end=`date +%s%N | cut -b1-13`
+local runtime=$((end-start))
 
 if [[ $result == *$FOLDER* ]]
 then
