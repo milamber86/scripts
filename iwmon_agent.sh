@@ -14,10 +14,10 @@
 # UserParameter=icewarp.easresult,/opt/icewarp/scripts/iwmon.sh "easlogin";cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
 # UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "smtp";cat /opt/icewarp/var/connstat_smtp.mon
-# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "pop";cat /opt/icewarp/var/connstat_pop.mon
-# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "imap";cat /opt/icewarp/var/connstat_imap.mon
-# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "xmpp";cat /opt/icewarp/var/connstat_xmpp.mon
-# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "http";cat /opt/icewarp/var/connstat_http.mon
+# UserParameter=icewarp.connpop,/opt/icewarp/scripts/iwmon.sh "connstat" "pop";cat /opt/icewarp/var/connstat_pop.mon
+# UserParameter=icewarp.connimap,/opt/icewarp/scripts/iwmon.sh "connstat" "imap";cat /opt/icewarp/var/connstat_imap.mon
+# UserParameter=icewarp.connxmpp,/opt/icewarp/scripts/iwmon.sh "connstat" "xmpp";cat /opt/icewarp/var/connstat_xmpp.mon
+# UserParameter=icewarp.connhttp,/opt/icewarp/scripts/iwmon.sh "connstat" "http";cat /opt/icewarp/var/connstat_http.mon
 # UserParameter=icewarp.queueinc,/opt/icewarp/scripts/iwmon.sh "queuestat" "inc";cat /opt/icewarp/var/queuestat_inc.mon
 # UserParameter=icewarp.queueoutg,/opt/icewarp/scripts/iwmon.sh "queuestat" "outg";cat /opt/icewarp/var/queuestat_outg.mon
 # UserParameter=icewarp.queueretr,/opt/icewarp/scripts/iwmon.sh "queuestat" "retr";cat /opt/icewarp/var/queuestat_retr.mon
