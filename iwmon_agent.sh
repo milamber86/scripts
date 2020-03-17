@@ -77,6 +77,7 @@ if [[ "${utiltest}" == *"no snmpget in"* ]]
 fi
 if [ ! -f ${scriptdir}/activesync.txt ]
   then
+  cd "${scriptdir}"
   wget https://mail.icewarp.cz/webdav/ticket/eJwNy0EOhCAMAMDf9KZbKw1w6NUP.IICZWNMNFE06.,duc9XWF0cCpY4qkGVeb,SfjyQZYJT2CeqgRHNEA7paHDeMfrgwASWfyZS5opa.KO5Lbedz5b79muwCuUQNOKY0gsMHR5N/activesync.txt
 fi
 utiltest="$(/opt/icewarp/tool.sh get system C_System_Adv_Ext_SNMPServer | awk '{print $2}')"
