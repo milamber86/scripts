@@ -3,15 +3,25 @@
 #  icewarp monitoring for zabbix
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
-# UserParameter=icewarp.smtp,cat /opt/icewarp/var/smtpstatus.mon
-# UserParameter=icewarp.imap,cat /opt/icewarp/var/imapstatus.mon
-# UserParameter=icewarp.http,cat /opt/icewarp/var/httpstatus.mon
-# UserParameter=icewarp.xmpp,cat /opt/icewarp/var/xmppcstatus.mon
-# UserParameter=icewarp.grw,cat /opt/icewarp/var/grwstatus.mon
-# UserParameter=icewarp.wcresult,cat /opt/icewarp/var/wcstatus.mon
+#
+# UserParameter=icewarp.smtp,/opt/icewarp/scripts/iwmon.sh "smtp";cat /opt/icewarp/var/smtpstatus.mon
+# UserParameter=icewarp.imap,/opt/icewarp/scripts/iwmon.sh "imap";cat /opt/icewarp/var/imapstatus.mon
+# UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
+# UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppcstatus.mon
+# UserParameter=icewarp.grw,/opt/icewarp/scripts/iwmon.sh "grw";cat /opt/icewarp/var/grwstatus.mon
+# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin";cat /opt/icewarp/var/wcstatus.mon
 # UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
-# UserParameter=icewarp.easresult,cat /opt/icewarp/var/easstatus.mon
+# UserParameter=icewarp.easresult,/opt/icewarp/scripts/iwmon.sh "easlogin";cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
+# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "smtp";cat /opt/icewarp/var/connstat_smtp.mon
+# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "pop";cat /opt/icewarp/var/connstat_pop.mon
+# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "imap";cat /opt/icewarp/var/connstat_imap.mon
+# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "xmpp";cat /opt/icewarp/var/connstat_xmpp.mon
+# UserParameter=icewarp.connsmtp,/opt/icewarp/scripts/iwmon.sh "connstat" "http";cat /opt/icewarp/var/connstat_http.mon
+# UserParameter=icewarp.queueinc,/opt/icewarp/scripts/iwmon.sh "queuestat" "inc";cat /opt/icewarp/var/queuestat_inc.mon
+# UserParameter=icewarp.queueoutg,/opt/icewarp/scripts/iwmon.sh "queuestat" "outg";cat /opt/icewarp/var/queuestat_outg.mon
+# UserParameter=icewarp.queueretr,/opt/icewarp/scripts/iwmon.sh "queuestat" "retr";cat /opt/icewarp/var/queuestat_retr.mon
+#
 #
 #VARS
 HOST="127.0.0.1";
@@ -20,12 +30,12 @@ EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
-email="wczabbixmon@example.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="Some-Pass-123";                                        # password
+email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
+pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
 
 #FUNC
-# install deps
+# install dependencies
 installdeps()
 {
 utiltest="$(/usr/bin/find /usr/lib64 -type f -name "Entities.pm")"
@@ -114,7 +124,7 @@ esac
 }
 
 # get number of mail in server queues
-queuestat() # ( queue name in outc, inc, retr -> number of messages )
+queuestat() # ( queue name in outg, inc, retr -> number of messages )
 {
 # get server mail queues paths
 local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
@@ -122,11 +132,11 @@ local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing 
 local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
 [ -z "${mail_inpath}" ] && local mail_inpath=$(/opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
 case "${1}" in
-outc) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
+outg) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
       if [[ ${?} -eq 0 ]]; then
-                           echo "${queue_outgoing_count}" > ${outputpath}/queuestat_outc.mon;
+                           echo "${queue_outgoing_count}" > ${outputpath}/queuestat_outg.mon;
                            else
-                           echo "9999" > ${outputpath}/queuestat_outc.mon;
+                           echo "9999" > ${outputpath}/queuestat_outg.mon;
       fi
 ;;
 inc)  local queue_incoming_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_inpath} -maxdepth 1 -type f -name "*.dat" | wc -l);
@@ -143,7 +153,7 @@ retr) local queue_outgoing_retry_count=$(timeout -k ${ctimeout} ${ctimeout} find
                            echo "9999" > ${outputpath}/queuestat_retr.mon;
       fi
 ;;
-*)    echo "Invalid argument. Use IceWarp queue name: outc, inc, retr"
+*)    echo "Invalid argument. Use IceWarp queue name: outg, inc, retr"
 ;;
 esac
 }
@@ -273,7 +283,8 @@ logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq
 curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php"
 local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
-echo "${freturn} ${runtime}"
+echo "${freturn}" > ${outputpath}/wcstatus.mon;
+echo "${runtime}" > ${outputpath}/wcruntime.mon;
 }
 
 # iw ActiveSync client login healthcheck
@@ -305,7 +316,8 @@ local freturn=OK
 else
 local freturn=FAIL
 fi
-echo "${freturn} ${runtime}"
+echo "${freturn}" > ${outputpath}/easstatus.mon;
+echo "${runtime}" > ${outputpath}/easruntime.mon;
 }
 
 #MAIN
@@ -319,18 +331,18 @@ xmpp) xmppstat;
 ;;
 grw) grwstat;
 ;;
-wc) wcstat "${2}";
+wc) wcstat;
 ;;
-wclogin) wccheck > ${outputpath}/wclogin.mon;
+wclogin) wccheck "${2}";
 ;;
-easlogin) eascheck > ${outputpath}/easlogin.mon;
+easlogin) eascheck;
 ;;
-connstat) connstat "${2}"
+connstat) connstat "${2}";
 ;;
-queuestat) queuestat "${2}"
+queuestat) queuestat "${2}";
 ;;
 *) echo -e 'Invalid command. Usage: iwmon.sh "<check_name>" "<optional: check_parameter>"\nAvailable checks: smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 ), easlogin\n'
-   echo -e 'iwmon.sh "<stat_name>"\nAvailable stats: connstat ( smtp, imap, xmpp, grw, http ), queuestat ( outc, inc, retr )'
+   echo -e 'iwmon.sh "<stat_name>"\nAvailable stats: connstat ( smtp, imap, xmpp, grw, http ), queuestat ( outg, inc, retr )'
 ;;
 esac
 exit 0
