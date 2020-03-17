@@ -13,6 +13,18 @@
 # UserParameter=icewarp.easresult,cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
 #
+#VARS
+HOST="127.0.0.1";
+monitoring="185.119.216.161";
+ctimeout=30;
+EASFOLDER="INBOX";
+scriptdir="$(cd $(dirname $0) && pwd)"
+logdate="$(date +%Y%m%d)"
+logfile="${scriptdir}/iwmon_${logdate}.log"
+email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
+pass="r4g53eR-4g54se6";                                      # password
+outputpath="/opt/icewarp/var";                               # results output path
+
 #FUNC
 # install deps
 installdeps()
@@ -92,14 +104,26 @@ local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing 
 local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
 [ -z "${mail_inpath}" ] && local mail_inpath=$(/opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
 case "${1}" in
-outc) local queue_outgoing_count=$(find ${mail_outpath} -maxdepth 1 -type f | wc -l);
-      echo "${queue_outgoing_count}" > ${outputpath}/queuestat_outc.mon;
+outc) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
+      if [[ ${?} -eq 0 ]]; then
+                           echo "${queue_outgoing_count}" > ${outputpath}/queuestat_outc.mon;
+                           else
+                           echo "9999" > ${outputpath}/queuestat_outc.mon;
+      fi
 ;;
-inc)  local queue_incoming_count=$(find ${mail_inpath} -maxdepth 1 -type f -name "*.dat" | wc -l);
-      echo "${queue_incoming_count}" > ${outputpath}/queuestat_inc.mon;
+inc)  local queue_incoming_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_inpath} -maxdepth 1 -type f -name "*.dat" | wc -l);
+      if [[ ${?} -eq 0 ]]; then
+                           echo "${queue_incoming_count}" > ${outputpath}/queuestat_inc.mon;
+                           else
+                           echo "9999" > ${outputpath}/queuestat_inc.mon;
+      fi
 ;;
-retr) local queue_outgoing_retry_count=$(find ${mail_outpath}retry/ -type f | wc -l);
-      echo "${queue_outgoing_retry_count}" > ${outputpath}/queuestat_retr.mon;
+retr) local queue_outgoing_retry_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath}retry/ -type f | wc -l);
+      if [[ ${?} -eq 0 ]]; then
+                           echo "${queue_outgoing_retry_count}" > ${outputpath}/queuestat_retr.mon;
+                           else
+                           echo "9999" > ${outputpath}/queuestat_retr.mon;
+      fi
 ;;
 *)    echo "Invalid argument. Use IceWarp queue name: outc, inc, retr"
 ;;
