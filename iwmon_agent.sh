@@ -1,9 +1,6 @@
 #!/bin/sh
-
 #  iwmon.sh
 #  icewarp monitoring for zabbix
-#
-#  Created by Otto Beranek on 15/02/2020.
 #
 #VARS
 HOST="127.0.0.1";                                            # monitored host IP/hostname
@@ -38,6 +35,16 @@ if [[ "${utiltest}" == *"no nc in"* ]]
   then
   log "Installing nc"
   /usr/bin/yum -y install nc
+fi
+utiltest="$(which wget)"
+if [[ "${utiltest}" == *"no nc in"* ]]
+  then
+  log "Installing wget"
+  /usr/bin/yum -y install nc
+fi
+if [ ! -f ${scriptdir}/activesync.txt ]
+  then
+  wget https://mail.icewarp.cz/webdav/ticket/eJwNy0EOhCAMAMDf9KZbKw1w6NUP.IICZWNMNFE06.,duc9XWF0cCpY4qkGVeb,SfjyQZYJT2CeqgRHNEA7paHDeMfrgwASWfyZS5opa.KO5Lbedz5b79muwCuUQNOKY0gsMHR5N/activesync.txt
 fi
 }
 
