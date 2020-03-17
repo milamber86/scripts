@@ -2,6 +2,17 @@
 #  iwmon.sh
 #  icewarp monitoring for zabbix
 #
+# zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
+# UserParameter=icewarp.smtp,cat /opt/icewarp/var/smtpstatus.mon
+# UserParameter=icewarp.imap,cat /opt/icewarp/var/imapstatus.mon
+# UserParameter=icewarp.http,cat /opt/icewarp/var/httpstatus.mon
+# UserParameter=icewarp.xmpp,cat /opt/icewarp/var/xmppcstatus.mon
+# UserParameter=icewarp.grw,cat /opt/icewarp/var/grwstatus.mon
+# UserParameter=icewarp.wcresult,cat /opt/icewarp/var/wcstatus.mon
+# UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
+# UserParameter=icewarp.easresult,cat /opt/icewarp/var/easstatus.mon
+# UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
+#
 #VARS
 HOST="127.0.0.1";                                            # monitored host IP/hostname
 ctimeout=30;                                                 # check timeout
