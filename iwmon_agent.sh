@@ -9,7 +9,7 @@
 # UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
 # UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppcstatus.mon
 # UserParameter=icewarp.grw,/opt/icewarp/scripts/iwmon.sh "grw";cat /opt/icewarp/var/grwstatus.mon
-# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin";cat /opt/icewarp/var/wcstatus.mon
+# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin" "1";cat /opt/icewarp/var/wcstatus.mon
 # UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
 # UserParameter=icewarp.easresult,/opt/icewarp/scripts/iwmon.sh "easlogin";cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
