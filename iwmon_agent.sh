@@ -36,7 +36,7 @@ outputpath="/opt/icewarp/var";                               # results output pa
 
 #FUNC
 # install dependencies
-installdeps()
+function installdeps()
 {
 utiltest="$(/usr/bin/find /usr/lib64 -type f -name "Entities.pm")"
 if [[ -z "${utiltest}" ]]
@@ -89,14 +89,13 @@ if [[ ${utiltest} != "1" ]]
 fi
 }
 
-# log function
-log()
+function log()
 {
 echo $(date +%H:%M:%S) $1 >> ${logfile}
 }
 
 # get number of connections for IceWarp service using SNMP
-connstat() # ( service name in smtp,pop,imap,xmpp,grw,http -> number of connections )
+function connstat() # ( service name in smtp,pop,imap,xmpp,grw,http -> number of connections )
 {
 case "${1}" in
 smtp) local conn_smtp_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.1 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
@@ -108,7 +107,7 @@ smtp) local conn_smtp_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6
       fi
 ;;
 pop)  local conn_pop3_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.2 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_smtp_count}" ]]
+      if [[ ! -z "${conn_pop3_count}" ]]
               then
               echo "${conn_pop3_count}" > ${outputpath}/connstat_pop.mon;
               else
@@ -117,7 +116,7 @@ pop)  local conn_pop3_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6
 
 ;;
 imap) local conn_imap_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.3 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_smtp_count}" ]]
+      if [[ ! -z "${conn_imap_count}" ]]
               then
               echo "${conn_imap_count}" > ${outputpath}/connstat_imap.mon;
               else
@@ -127,7 +126,7 @@ imap) local conn_imap_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6
 xmpp) local conn_im_count_server=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count_client=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count=$((${conn_im_count_server} + ${conn_im_count_client}));
-      if [[ ! -z "${conn_smtp_count}" ]]
+      if [[ ! -z "${conn_im_count}" ]]
               then
               echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
               else
@@ -135,7 +134,7 @@ xmpp) local conn_im_count_server=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 
       fi
 ;;
 grw)  local conn_gw_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_smtp_count}" ]]
+      if [[ ! -z "${conn_gw_count}" ]]
               then
               echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
               else
@@ -143,7 +142,7 @@ grw)  local conn_gw_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1
       fi
 ;;
 http) local conn_web_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.7 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_smtp_count}" ]]
+      if [[ ! -z "${conn_web_count}" ]]
               then
               echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
               else
@@ -156,7 +155,7 @@ esac
 }
 
 # get number of mail in server queues
-queuestat() # ( queue name in outg, inc, retr -> number of messages )
+function queuestat() # ( queue name in outg, inc, retr -> number of messages )
 {
 # get server mail queues paths
 local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
@@ -191,7 +190,7 @@ esac
 }
 
 # iw smtp server simple check
-smtpstat()
+function smtpstat()
 {
 local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220")"
 if [ "${SMTP_RESPONSE}" == "220" ]; then
@@ -202,7 +201,7 @@ fi
 }
 
 # iw imap server simple check
-imapstat()
+function imapstat()
 {
 local IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
 if [ "${IMAP_RESPONSE}" == "OK" ]; then
@@ -213,7 +212,7 @@ fi
 }
 
 # iw web server simple check
-wcstat()
+function wcstat()
 {
 local HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
@@ -224,18 +223,18 @@ fi
 }
 
 # iw xmpp server simple check
-xmppstat()
+function xmppstat()
 {
 local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
 if [ "${XMPP_RESPONSE}" == "xmlns" ]; then
-                        echo "OK" > ${outputpath}/xmppcstatus.mon
+                        echo "OK" > ${outputpath}/xmppstatus.mon
                           else
-                        echo "FAIL" > ${outputpath}/xmppcstatus.mon
+                        echo "FAIL" > ${outputpath}/xmppstatus.mon
 fi
 }
 
 # iw groupware server simple check
-grwstat()
+function grwstat()
 {
 local GRW_RESPONSE="$(echo "test" | nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
 if [ "${GRW_RESPONSE}" == "greeting" ]; then
@@ -246,7 +245,7 @@ fi
 }
 
 # urlencode string
-rawurlencode() {
+function rawurlencode() {
   local string="${1}"
   local strlen=${#string}
   local encoded=""
@@ -264,7 +263,7 @@ rawurlencode() {
 }
 
 # iw web client login healthcheck
-wccheck() # ( guest 0/1 -> OK, FAIL; time spent in ms )
+function wccheck() # ( guest 0/1 -> OK, FAIL; time spent in ms )
 {
 local guest=${1}
 local iwserver="${HOST}"
@@ -320,7 +319,7 @@ echo "${runtime}" > ${outputpath}/wcruntime.mon;
 }
 
 # iw ActiveSync client login healthcheck
-eascheck() # ( -> status OK, FAIL; time spent in ms )
+function eascheck() # ( -> status OK, FAIL; time spent in ms )
 {
 local FOLDER="${EASFOLDER}";
 declare DBUSER=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
@@ -337,7 +336,6 @@ local start=`date +%s%N | cut -b1-13`
 local result=`/usr/bin/curl -s -k -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
 local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
-
 if [[ $result == *$FOLDER* ]]
 then
 local freturn=OK
@@ -347,6 +345,64 @@ fi
 echo "${freturn}" > ${outputpath}/easstatus.mon;
 echo "${runtime}" > ${outputpath}/easruntime.mon;
 }
+
+function printStats() {
+echo "last value update - service: check result"
+for SIMPLECHECK in smtp imap xmpp grw http
+    do
+    echo -n "$(stat -c'%y' "${outputpath}/${SIMPLECHECK}status.mon") - "
+    echo -n "${SIMPLECHECK}: "
+    cat "${outputpath}/${SIMPLECHECK}status.mon"
+done
+for CONNCHECK in smtp pop imap xmpp http
+    do
+    echo -n "$(stat -c'%y' "${outputpath}/connstat_${CONNCHECK}.mon") - "
+    echo -n "${CONNCHECK}: "
+    cat "${outputpath}/connstat_${CONNCHECK}.mon"
+done
+for QUEUECHECK in inc outg retr
+    do
+    echo -n "$(stat -c'%y' "${outputpath}/queuestat_${QUEUECHECK}.mon") - "
+    echo -n "${QUEUECHECK}: "
+    cat "${outputpath}/queuestat_${QUEUECHECK}.mon"
+done
+echo -n "$(stat -c'%y' "${outputpath}/wcstatus.mon") - "
+echo -n "WebClient login: "
+cat "${outputpath}/wcstatus.mon"
+echo -n "$(stat -c'%y' "${outputpath}/wcruntime.mon") - "
+echo -n "time spent: "
+cat "${outputpath}/wcruntime.mon"
+echo -n "$(stat -c'%y' "${outputpath}/easstatus.mon") - "
+echo -n "ActiveSync login: "
+cat "${outputpath}/easstatus.mon"
+echo -n "$(stat -c'%y' "${outputpath}/easruntime.mon") - "
+echo -n "time spent: "
+cat "${outputpath}/easruntime.mon"
+}
+
+function printUsage() {
+    cat <<EOF
+
+Synopsis
+    iwmon.sh check_name [ check_parameter ]
+    supported health-checks: smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
+    
+    iwmon.sh connstat [ service_name ]
+    supported services: smtp, imap, xmpp, grw, http
+    
+    iwmon.sh queuestat [ smtp_queue_name ]
+    available queues: inc ( incoming ), outg ( outgoing ), retr ( outgoing-retry )
+    
+    iwmon.sh all silent/verbose
+    get all stats in one run and optionally print the stats to STDOUT
+    
+    
+    Performs healthchecks and queries service connection number stats and smtp
+    queue lengths for IceWarp server.
+    
+EOF
+}
+
 
 #MAIN
 installdeps
@@ -369,8 +425,28 @@ connstat) connstat "${2}";
 ;;
 queuestat) queuestat "${2}";
 ;;
-*) echo -e 'Invalid command. Usage: iwmon.sh "<check_name>" "<optional: check_parameter>"\nAvailable checks: smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 ), easlogin\n'
-   echo -e 'iwmon.sh "<stat_name>"\nAvailable stats: connstat ( smtp, imap, xmpp, grw, http ), queuestat ( outg, inc, retr )'
+all) if [[ "${2}" == "verbose" ]]
+        then
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;
+        for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
+        for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
+        printStats;
+     fi
+     if [[ "${2}" == "silent" ]]
+        then
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;
+        for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
+        for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
+     fi
+     if [[ "${2}" != "verbose" ]]
+        then
+        if [[ "${2}" != "silent" ]]
+            then
+            printUsage;
+        fi
+     fi
+;;
+*) printUsage;
 ;;
 esac
 exit 0
