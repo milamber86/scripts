@@ -100,24 +100,55 @@ connstat() # ( service name in smtp,pop,imap,xmpp,grw,http -> number of connecti
 {
 case "${1}" in
 smtp) local conn_smtp_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.1 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      echo "${conn_smtp_count}" > ${outputpath}/connstat_smtp.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_smtp_count}" > ${outputpath}/connstat_smtp.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_smtp.mon;
+      fi
 ;;
 pop)  local conn_pop3_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.2 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      echo "${conn_pop3_count}" > ${outputpath}/connstat_pop.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_pop3_count}" > ${outputpath}/connstat_pop.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_pop.mon;
+      fi
+
 ;;
 imap) local conn_imap_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.3 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      echo "${conn_imap_count}" > ${outputpath}/connstat_imap.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_imap_count}" > ${outputpath}/connstat_imap.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_imap.mon;
+      fi
 ;;
 xmpp) local conn_im_count_server=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count_client=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count=$((${conn_im_count_server} + ${conn_im_count_client}));
-      echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_xmpp.mon;
+      fi
 ;;
 grw)  local conn_gw_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_grw.mon;
+      fi
 ;;
 http) local conn_web_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.7 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
+      if [[ ! -z "${conn_smtp_count}" ]]
+              then
+              echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
+              else
+              echo "99999" > ${outputpath}/connstat_web.mon;
+      fi
 ;;
 *)    echo "Invalid argument. Use IceWarp service name: smtp, pop, imap, xmpp, grw, http"
 ;;
