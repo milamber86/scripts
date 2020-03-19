@@ -99,24 +99,24 @@ echo $(date +%H:%M:%S) $1 >> ${logfile}
 connstat() # ( service name in smtp,pop,imap,xmpp,grw,http -> number of connections )
 {
 case "${1}" in
-smtp) local conn_smtp_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.1 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+smtp) local conn_smtp_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.1 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_smtp_count}" > ${outputpath}/connstat_smtp.mon;
 ;;
-pop)  local conn_pop3_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.2 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+pop)  local conn_pop3_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.2 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_pop3_count}" > ${outputpath}/connstat_pop.mon;
 ;;
-imap) local conn_imap_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.3 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+imap) local conn_imap_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.3 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_imap_count}" > ${outputpath}/connstat_imap.mon;
 ;;
-xmpp) local conn_im_count_server=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      local conn_im_count_client=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+xmpp) local conn_im_count_server=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+      local conn_im_count_client=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       local conn_im_count=$((${conn_im_count_server} + ${conn_im_count_client}));
       echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
 ;;
-grw)  local conn_gw_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+grw)  local conn_gw_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
 ;;
-http) local conn_web_count=$(snmpget -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.7 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
+http) local conn_web_count=$(snmpget -r 2 -t 10 -v 1 -c private 127.0.0.1 1.3.6.1.4.1.23736.1.2.1.1.2.8.7 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
       echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
 ;;
 *)    echo "Invalid argument. Use IceWarp service name: smtp, pop, imap, xmpp, grw, http"
