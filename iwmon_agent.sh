@@ -33,7 +33,7 @@ logfile="${scriptdir}/iwmon_${logdate}.log"
 email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
-
+#
 #FUNC
 # install dependencies
 function installdeps()
@@ -355,7 +355,7 @@ for SIMPLECHECK in smtp imap xmpp grw http
     echo -n "${SIMPLECHECK}: "
     cat "${outputpath}/${SIMPLECHECK}status.mon"
 done
-for CONNCHECK in smtp pop imap xmpp http
+for CONNCHECK in smtp imap xmpp http
     do
     echo -n "$(stat -c'%y' "${outputpath}/connstat_${CONNCHECK}.mon") - "
     echo -n "${CONNCHECK}: "
@@ -385,6 +385,9 @@ function printUsage() {
     cat <<EOF
 
 Synopsis
+    iwmon.sh setup
+    checks and installs dependencies
+ 
     iwmon.sh check_name [ check_parameter ]
     supported health-checks: smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
     
@@ -397,7 +400,7 @@ Synopsis
     iwmon.sh all silent/verbose
     get all stats in one run and optionally print the stats to STDOUT
     
-    
+    ---
     Performs healthchecks and queries service connection number stats and smtp
     queue lengths for IceWarp server.
     
@@ -406,8 +409,9 @@ EOF
 
 
 #MAIN
-installdeps
 case ${1} in
+setup) installdeps;
+;;
 smtp) smtpstat;
 ;;
 imap) imapstat;
