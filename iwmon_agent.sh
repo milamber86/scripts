@@ -69,6 +69,12 @@ if [[ ${?} -ne 0 ]]
   log "Installing dos2unix"
   /usr/bin/yum -y install dos2unix
 fi
+which mysql > /dev/null 2>&1
+if [[ ${?} -ne 0 ]]
+  then
+  log "Installing mysql client"
+  /usr/bin/yum -y install mysql
+fi
 which snmpget > /dev/null 2>&1
 if [[ ${?} -ne 0 ]]
   then
@@ -160,9 +166,9 @@ function queuestat() # ( queue name in outg, inc, retr -> number of messages )
 {
 # get server mail queues paths
 local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
-[ -z "${mail_outpath}" ] && local mail_outpath=$(/opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
+[ -z "${mail_outpath}" ] && local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
 local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
-[ -z "${mail_inpath}" ] && local mail_inpath=$(/opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
+[ -z "${mail_inpath}" ] && local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
 case "${1}" in
 outg) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
       if [[ ${?} -eq 0 ]]; then
@@ -272,11 +278,19 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
     then
      local guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
      local guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
-     /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
+     timeout -k 3 3 /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
      local result=$?
      if [[ ${result} != 0 ]]
          then
-         /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
+         timeout -k 5 5 /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
+         local result=$?
+         if [[ ${result} != 0 ]]
+            then
+            echo "${freturn}" > ${outputpath}/wcstatus.mon;
+            echo "9999" > ${outputpath}/wcruntime.mon;
+            log "Failed to create test account"
+            return 1
+         fi
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
@@ -317,24 +331,25 @@ local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 echo "${freturn}" > ${outputpath}/wcstatus.mon;
 echo "${runtime}" > ${outputpath}/wcruntime.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
 # iw ActiveSync client login healthcheck
 function eascheck() # ( -> status OK, FAIL; time spent in ms )
 {
 local FOLDER="${EASFOLDER}";
-declare DBUSER=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
-declare DBPASS=$(/opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
-read DBHOST DBPORT DBNAME <<<$(/opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
-read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" |  mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
-/opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
-declare PASS=$(/opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
-/opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
+declare DBUSER=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
+declare DBPASS=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
+read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
+read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
+declare PASS=$(timeout -k 3 3 /opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
 local aURI="000EASHealthCheck000"
 local aTYPE="IceWarpAnnihilator"
 declare -i aSYNCKEY=${aKEY};
 local start=`date +%s%N | cut -b1-13`
-local result=`/usr/bin/curl -s -k -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
+local result=`/usr/bin/curl -s -k --connect-timeout ${ctimeout} -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
 local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 if [[ $result == *$FOLDER* ]]
@@ -348,6 +363,7 @@ echo "${runtime}" > ${outputpath}/easruntime.mon;
 }
 
 function printStats() {
+echo "IceWarp stats for ${HOSTNAME}"
 echo "last value update - service: check result"
 for SIMPLECHECK in smtp imap xmpp grw http
     do
