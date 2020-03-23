@@ -11,6 +11,8 @@ backupsrvport="${2}" # than the one we connect to
 cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<cloudplanislive>).*(?=</cloudplanislive>)' -o -m 1)
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
+rtdays="7"; # how many daily backups to keep
+rtlogs="31"; # how many days of logs to keep
 
 function log {
   echo $(date +%H:%M:%S) $1 >> ${logfile}
@@ -91,7 +93,7 @@ ${IWS_INSTALL_DIR}/tool.sh export account "*@*" u_backup > ${backuppath}/bck_acc
 ${IWS_INSTALL_DIR}/tool.sh export domain "*" d_backup > ${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv
 log "Finished IW config backup."
 log "Cleaning old backups and logs."
-/usr/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +3 -delete > /dev/null 2>&1
-/usr/bin/find ${scriptdir}/logs/ -type f -name "bck_*.log" -mtime +30 -delete > /dev/null 2>&1
+/usr/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +${rtdays} -delete > /dev/null 2>&1
+/usr/bin/find ${scriptdir}/logs/ -type f -name "bck_*.log" -mtime +${rtlogs} -delete > /dev/null 2>&1
 log "All done."
 exit 0
