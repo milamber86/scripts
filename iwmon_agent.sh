@@ -221,7 +221,7 @@ fi
 # iw web server simple check
 function wcstat()
 {
-local HTTP_RESPONSE="$(curl -s -k -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
+local HTTP_RESPONSE="$(curl -s -k --connect-timeout 5 -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
                         echo "OK" > ${outputpath}/httpstatus.mon
                           else
@@ -278,30 +278,27 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
     then
      local guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
      local guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
-     timeout -k 3 3 /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
+     timeout -k 10 10 /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
      local result=$?
      if [[ ${result} != 0 ]]
          then
-         timeout -k 5 5 /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
+         timeout -k 10 10 /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
          local result=$?
-         if [[ ${result} != 0 ]]
-            then
-            echo "${freturn}" > ${outputpath}/wcstatus.mon;
-            echo "9999" > ${outputpath}/wcruntime.mon;
-            log "Failed to create test account"
-            return 1
-         fi
+         if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Error creating test account";return 1;fi
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
 # get auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+if [ -z "${wcatoken}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 1 fail - Error getting webclient auth token from control";return 1;fi
 # get phpsessid
 local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error getting php session ID";return 1;fi
 # auth wc session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
 local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error logging to the webclient";return 1;fi
 if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
     then
      # refresh folders standard account start
