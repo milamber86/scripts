@@ -1,13 +1,15 @@
 #!/bin/sh
-#  iwmon.sh
-#  icewarp monitoring for zabbix
+# iwmon.sh
+# IceWarp monitoring for Zabbix
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
+# UserParameter=icewarp.smtp,/opt/icewarp/scripts/iwmon.sh "cfg";cat /opt/icewarp/var/cfgstatus.mon
+# UserParameter=icewarp.smtp,/opt/icewarp/scripts/iwmon.sh "nfs";cat /opt/icewarp/var/nfsmntstatus.mon
 # UserParameter=icewarp.smtp,/opt/icewarp/scripts/iwmon.sh "smtp";cat /opt/icewarp/var/smtpstatus.mon
 # UserParameter=icewarp.imap,/opt/icewarp/scripts/iwmon.sh "imap";cat /opt/icewarp/var/imapstatus.mon
 # UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
-# UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppcstatus.mon
+# UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppstatus.mon
 # UserParameter=icewarp.grw,/opt/icewarp/scripts/iwmon.sh "grw";cat /opt/icewarp/var/grwstatus.mon
 # UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin" "1";cat /opt/icewarp/var/wcstatus.mon
 # UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
@@ -33,8 +35,53 @@ logfile="${scriptdir}/iwmon_${logdate}.log"
 email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
-#
+nfstestfile="/mnt/data-nfs/check.txt"                        # path to nfs mount test file ( must exist )
+
 #FUNC
+# write setting to configfile
+function writecfg() # ( setting_name, setting_value )
+{
+tmpcfg="$(cat ${scriptdir}/iwmon.cfg | grep -v "${1}")";
+echo "${tmpcfg}" > "${scriptdir}"/iwmon_tmp.cfg
+echo "${1}:${2}" >> "${scriptdir}"/iwmon_tmp.cfg
+mv -f "${scriptdir}"/iwmon_tmp.cfg "${scriptdir}"/iwmon.cfg
+return 0
+}
+
+# read setting from configfile
+function readcfg() # ( setting_name -> setting_value )
+{
+result="$(/usr/bin/grep "${1}" ${scriptdir}/iwmon.cfg | awk -F ':' '{print $2}' )";
+if [ -z "${result}" ]
+  then
+  echo "Variable ${1} empty or not found";
+  return 1
+  else
+  echo "${result}"
+  return 0
+fi
+}
+
+# set initial settings to iwmon.cfg
+function init()
+{
+local FILE="/opt/icewarp/path.dat"
+if [ -f "${FILE}" ]
+  then
+  local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
+  [ -z "${mail_outpath}" ] && local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
+  local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
+  [ -z "${mail_inpath}" ] && local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
+  else
+  local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|');
+  local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|');
+fi
+writecfg "mail_outpath" "${mail_outpath}";
+writecfg "mail_inpath" "${mail_inpath}";
+local super="$(timeout -k 30 30 /opt/icewarp/tool.sh get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
+writecfg "super" "${super}";
+}
+
 # install dependencies
 function installdeps()
 {
@@ -98,6 +145,41 @@ fi
 function log()
 {
 echo $(date +%H:%M:%S) $1 >> ${logfile}
+}
+
+# nfs mount available check
+function nfsmntstat()
+{
+if [ -f "${nfstestfile}" ]
+  then
+  echo "OK" > ${outputpath}/nfsmntstatus.mon;
+  return 0
+  else
+  echo "FAIL" > ${outputpath}/nfsmntstatus.mon;
+  return 1
+fi
+}
+
+# check main config changed ( detect accidental configuration self-reset )
+function cfgstat()
+{
+local super="$(readcfg "super")";
+local result="$(timeout -k 10 10 /opt/icewarp/tool.sh get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
+if [[ "${super}" == "${result}" ]]
+  then
+  echo "OK" > ${outputpath}/cfgstatus.mon;
+  return 0
+  else
+  echo "FAIL" > ${outputpath}/cfgstatus.mon;
+  return 1
+fi
+}
+
+# check groupware database is available
+function gwdbcheck()
+{
+local todo=1
+# TODO
 }
 
 # get number of connections for IceWarp service using SNMP
@@ -164,11 +246,8 @@ esac
 # get number of mail in server queues
 function queuestat() # ( queue name in outg, inc, retr -> number of messages )
 {
-# get server mail queues paths
-local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
-[ -z "${mail_outpath}" ] && local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
-local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
-[ -z "${mail_inpath}" ] && local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
+local mail_outpath=$(readcfg "mail_outpath");
+local mail_inpath=$(readcfg "mail_inpath");
 case "${1}" in
 outg) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
       if [[ ${?} -eq 0 ]]; then
@@ -357,29 +436,34 @@ local freturn=FAIL
 fi
 echo "${freturn}" > ${outputpath}/easstatus.mon;
 echo "${runtime}" > ${outputpath}/easruntime.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
 function printStats() {
 echo "IceWarp stats for ${HOSTNAME}"
 echo "last value update - service: check result"
-for SIMPLECHECK in smtp imap xmpp grw http
+echo "--- Status ( OK | FAIL ):"
+for SIMPLECHECK in smtp imap xmpp grw http nfsmnt cfg
     do
     echo -n "$(stat -c'%y' "${outputpath}/${SIMPLECHECK}status.mon") - "
     echo -n "${SIMPLECHECK}: "
     cat "${outputpath}/${SIMPLECHECK}status.mon"
 done
+echo "--- Number of connections:"
 for CONNCHECK in smtp imap xmpp http
     do
     echo -n "$(stat -c'%y' "${outputpath}/connstat_${CONNCHECK}.mon") - "
     echo -n "${CONNCHECK}: "
     cat "${outputpath}/connstat_${CONNCHECK}.mon"
 done
+echo "--- Smtp queues number of messages:"
 for QUEUECHECK in inc outg retr
     do
     echo -n "$(stat -c'%y' "${outputpath}/queuestat_${QUEUECHECK}.mon") - "
     echo -n "${QUEUECHECK}: "
     cat "${outputpath}/queuestat_${QUEUECHECK}.mon"
 done
+echo "--- WebClient and ActiveSync:"
 echo -n "$(stat -c'%y' "${outputpath}/wcstatus.mon") - "
 echo -n "WebClient login: "
 cat "${outputpath}/wcstatus.mon"
@@ -402,7 +486,7 @@ Synopsis
     checks and installs dependencies
  
     iwmon.sh check_name [ check_parameter ]
-    supported health-checks: smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
+    supported health-checks: cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
     
     iwmon.sh connstat [ service_name ]
     supported services: smtp, imap, xmpp, grw, http
@@ -424,6 +508,11 @@ EOF
 #MAIN
 case ${1} in
 setup) installdeps;
+       init;
+;;
+nfs) nfsmntstat;
+;;
+cfg) cfgstat;
 ;;
 smtp) smtpstat;
 ;;
@@ -445,14 +534,14 @@ queuestat) queuestat "${2}";
 ;;
 all) if [[ "${2}" == "verbose" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfsmntstat;cfgstat;
         for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfscheck;cfgcheck;
         for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
