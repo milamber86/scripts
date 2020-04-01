@@ -23,10 +23,21 @@
 # UserParameter=icewarp.queueinc,/opt/icewarp/scripts/iwmon.sh "queuestat" "inc";cat /opt/icewarp/var/queuestat_inc.mon
 # UserParameter=icewarp.queueoutg,/opt/icewarp/scripts/iwmon.sh "queuestat" "outg";cat /opt/icewarp/var/queuestat_outg.mon
 # UserParameter=icewarp.queueretr,/opt/icewarp/scripts/iwmon.sh "queuestat" "retr";cat /opt/icewarp/var/queuestat_retr.mon
-#
+# UserParameter=icewarp.msgout,/opt/icewarp/scripts/iwmon.sh "connstat" "msgout";cat /opt/icewarp/var/smtpstat_msgout.mon
+# UserParameter=icewarp.msgin,/opt/icewarp/scripts/iwmon.sh "connstat" "msgin";cat /opt/icewarp/var/smtpstat_msgin.mon
+# UserParameter=icewarp.msgfail,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfail";cat /opt/icewarp/var/smtpstat_msgfail.mon
+# UserParameter=icewarp.msgfaildata,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfaildata";cat /opt/icewarp/var/smtpstat_msgfaildata.mon
+# UserParameter=icewarp.msgfailvirus,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailvirus";cat /opt/icewarp/var/smtpstat_msgfailvirus.mon
+# UserParameter=icewarp.msgfailcf,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailcf";cat /opt/icewarp/var/smtpstat_msgfailcf.mon
+# UserParameter=icewarp.msgfailextcf,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailextcf";cat /opt/icewarp/var/smtpstat_msgfailextcf.mon
+# UserParameter=icewarp.msgfailrule,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailrule";cat /opt/icewarp/var/smtpstat_msgfailrule.mon
+# UserParameter=icewarp.msgfaildnsbl,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfaildnsbl";cat /opt/icewarp/var/smtpstat_msgfaildnsbl.mon
+# UserParameter=icewarp.msgfailips,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailips";cat /opt/icewarp/var/smtpstat_msgfailips.mon
+# UserParameter=icewarp.msgfailspam,/opt/icewarp/scripts/iwmon.sh "connstat" "msgfailspam";cat /opt/icewarp/var/smtpstat_msgfailspam.mon
 #
 #VARS
 HOST="127.0.0.1";
+SNMPPORT="161"
 ctimeout=30;
 EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
@@ -36,6 +47,7 @@ email="wczabbixmon@icewarp.loc";                             # email address, st
 pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
 nfstestfile="/mnt/data-nfs/check.txt"                        # path to nfs mount test file ( must exist )
+/usr/bin/touch "${scriptdir}/iwmon.cfg"
 
 #FUNC
 # write setting to configfile
@@ -80,6 +92,18 @@ writecfg "mail_outpath" "${mail_outpath}";
 writecfg "mail_inpath" "${mail_inpath}";
 local super="$(timeout -k 30 30 /opt/icewarp/tool.sh get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 writecfg "super" "${super}";
+declare DBUSER=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
+declare DBPASS=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
+read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
+read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
+declare PASS=$(timeout -k 3 3 /opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
+timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
+writecfg "EASUser" "${USER}"
+writecfg "EASPass" "${PASS}"
+writecfg "EASVers" "${aVER}"
 }
 
 # install dependencies
@@ -517,17 +541,12 @@ if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 # iw ActiveSync client login healthcheck
 function eascheck() # ( -> status OK, FAIL; time spent in ms )
 {
+local USER=$(readcfg "EASUser");
+local PASS=$(readcfg "EASPass");
+local aVER=$(readcfg "EASVers");
 local FOLDER="${EASFOLDER}";
-declare DBUSER=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
-declare DBPASS=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
-read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
-read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
-declare PASS=$(timeout -k 3 3 /opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
 local aURI="000EASHealthCheck000"
 local aTYPE="IceWarpAnnihilator"
-declare -i aSYNCKEY=${aKEY};
 local start=`date +%s%N | cut -b1-13`
 local result=`/usr/bin/curl -s -k --connect-timeout ${ctimeout} -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
 local end=`date +%s%N | cut -b1-13`
@@ -560,7 +579,7 @@ for CONNCHECK in smtp imap xmpp http
     echo -n "${CONNCHECK}: "
     cat "${outputpath}/connstat_${CONNCHECK}.mon"
 done
-echo "--- Smtp queues number of messages:"
+echo "--- SMTP queues number of messages:"
 for QUEUECHECK in inc outg retr
     do
     echo -n "$(stat -c'%y' "${outputpath}/queuestat_${QUEUECHECK}.mon") - "
