@@ -406,7 +406,7 @@ esac
 # iw smtp server simple check
 function smtpstat()
 {
-local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220")"
+local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220" | head 1)"
 if [ "${SMTP_RESPONSE}" == "220" ]; then
                         echo "OK" > ${outputpath}/smtpstatus.mon
                           else
