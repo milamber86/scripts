@@ -182,20 +182,35 @@ local todo=1
 # TODO
 }
 
+# get value from IceWarp snmp ( https://esupport.icewarp.com/index.php?/Knowledgebase/Article/View/180/16/snmp-in-icewarp )
+function iwsnmpget() # ( iw snmp SvcID.SVC -> snmp response value )
+{
+local test="$(snmpget -r 1 -t 1 -v 1 -c private ${HOST}:${SNMPPORT} "1.3.6.1.4.1.23736.1.2.1.1.2.${1}")"
+      if [[ ${?} != 0 ]]
+        then
+          echo "Fail";
+          return 1;
+        else
+          local result="$(echo "${test}" | sed -r 's|^.*INTEGER:\s(.*)$|\1|')";
+          echo "${result}";
+          return 0
+      fi
+}
+
 # get number of connections for IceWarp service using SNMP
 function connstat() # ( service name in smtp,pop,imap,xmpp,grw,http -> number of connections )
 {
 case "${1}" in
-smtp) local conn_smtp_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.1 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_smtp_count}" ]]
+smtp) local conn_smtp_count="$(iwsnmpget "8.1")";
+      if [[ "${conn_smtp_count}" != "Fail" ]]
               then
               echo "${conn_smtp_count}" > ${outputpath}/connstat_smtp.mon;
               else
               echo "99999" > ${outputpath}/connstat_smtp.mon;
       fi
 ;;
-pop)  local conn_pop3_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.2 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_pop3_count}" ]]
+pop)  local conn_pop3_count="$(iwsnmpget "8.2")";
+      if [[ "${conn_pop3_count}" != "Fail" ]]
               then
               echo "${conn_pop3_count}" > ${outputpath}/connstat_pop.mon;
               else
@@ -203,17 +218,17 @@ pop)  local conn_pop3_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPO
       fi
 
 ;;
-imap) local conn_imap_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.3 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_imap_count}" ]]
+imap) local conn_imap_count="$(iwsnmpget "8.3")";
+      if [[ "${conn_imap_count}" != "Fail" ]]
               then
               echo "${conn_imap_count}" > ${outputpath}/connstat_imap.mon;
               else
               echo "99999" > ${outputpath}/connstat_imap.mon;
       fi
 ;;
-xmpp) local conn_im_count_server=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      local conn_im_count_client=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.10.4 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_im_count_server}" ]];then if [[ ! -z "${conn_im_count_client}" ]]
+xmpp) local conn_im_count_server="$(iwsnmpget "8.4")";
+      local conn_im_count_client="$(iwsnmpget "10.4")";
+      if [[ "${conn_im_count_server}" != "Fail" ]];then if [[ "${conn_im_count_client}" != "Fail" ]]
             then
             local conn_im_count=$((${conn_im_count_server} + ${conn_im_count_client}));
             echo "${conn_im_count}" > ${outputpath}/connstat_xmpp.mon;
@@ -222,23 +237,112 @@ xmpp) local conn_im_count_server=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${S
             fi
       fi
 ;;
-grw)  local conn_gw_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.5 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_gw_count}" ]]
+grw)  local conn_gw_count="$(iwsnmpget "8.5")";
+      if [[ "${conn_gw_count}" != "Fail" ]]
               then
               echo "${conn_gw_count}" > ${outputpath}/connstat_grw.mon;
               else
               echo "99999" > ${outputpath}/connstat_grw.mon;
       fi
 ;;
-http) local conn_web_count=$(snmpget -r 2 -t 3 -v 1 -c private ${HOST}:${SNMPPORT} 1.3.6.1.4.1.23736.1.2.1.1.2.8.7 | sed -r 's|^.*INTEGER:\s(.*)$|\1|');
-      if [[ ! -z "${conn_web_count}" ]]
+http) local conn_web_count="$(iwsnmpget "8.7")";
+      if [[ "${conn_web_count}" != "Fail" ]]
               then
               echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
               else
               echo "99999" > ${outputpath}/connstat_web.mon;
       fi
 ;;
-*)    echo "Invalid argument. Use IceWarp service name: smtp, pop, imap, xmpp, grw, http"
+msgout) local smtp_msg_out="$(iwsnmpget "16.1")";
+      if [[ "${smtp_msg_out}" != "Fail" ]]
+        then
+        echo "${smtp_msg_out}" > ${outputpath}/smtpstat_msgout.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgout.mon;
+      fi
+;;
+msgin) local smtp_msg_in="$(iwsnmpget "17.1")";
+      if [[ "${smtp_msg_in}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_in}" > ${outputpath}/smtpstat_msgin.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgin.mon;
+      fi
+;;
+msgfail) local smtp_msg_fail="$(iwsnmpget "18.1")";
+      if [[ "${smtp_msg_fail}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail}" > ${outputpath}/smtpstat_msgfail.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfail.mon;
+      fi
+;;
+msgfaildata) local smtp_msg_fail_data="$(iwsnmpget "19.1")";
+      if [[ "${smtp_msg_fail_data}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_data}" > ${outputpath}/smtpstat_msgfaildata.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfaildata.mon;
+      fi
+;;
+msgfailvirus) local smtp_msg_fail_virus="$(iwsnmpget "20.1")";
+      if [[ "${smtp_msg_fail_virus}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_virus}" > ${outputpath}/smtpstat_msgfailvirus.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailvirus.mon;
+      fi
+;;
+msgfailcf) local smtp_msg_fail_cf="$(iwsnmpget "21.1")";
+      if [[ "${smtp_msg_fail_cf}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_cf}" > ${outputpath}/smtpstat_msgfailcf.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailcf.mon;
+      fi
+;;
+msgfailextcf) local smtp_msg_fail_extcf="$(iwsnmpget "22.1")";
+      if [[ "${smtp_msg_fail_extcf}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_extcf}" > ${outputpath}/smtpstat_msgfailextcf.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailextcf.mon;
+      fi
+;;
+msgfailrule) local smtp_msg_fail_rule="$(iwsnmpget "23.1")";
+      if [[ "${smtp_msg_fail_rule}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_rule}" > ${outputpath}/smtpstat_msgfailrule.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailrule.mon;
+      fi
+;;
+msgfaildnsbl) local smtp_msg_fail_dnsbl="$(iwsnmpget "24.1")";
+      if [[ "${smtp_msg_fail_dnsbl}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_dnsbl}" > ${outputpath}/smtpstat_msgfaildnsbl.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfaildnsbl.mon;
+      fi
+;;
+msgfailips) local smtp_msg_fail_ips="$(iwsnmpget "25.1")";
+      if [[ "${smtp_msg_fail_ips}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_ips}" > ${outputpath}/smtpstat_msgfailips.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailips.mon;
+      fi
+;;
+msgfailspam) local smtp_msg_fail_spam="$(iwsnmpget "26.1")";
+      if [[ "${smtp_msg_fail_spam}" != "Fail"  ]]
+        then
+        echo "${smtp_msg_fail_spam}" > ${outputpath}/smtpstat_msgfailspam.mon;
+        else
+        echo "99999" > ${outputpath}/smtpstat_msgfailspam.mon;
+      fi
+;;
+*)    echo "Invalid argument. Use IceWarp service snmp name: smtp, pop, imap, xmpp, grw, http,"
+      echo "SMTP stats: msgout, msgin, msgfail, msgfaildata, msgfailvirus, msgfailcf, msgfailextcf, msgfailrule, msgfaildnsbl, msgfailips, msgfailspam"
 ;;
 esac
 }
@@ -463,6 +567,13 @@ for QUEUECHECK in inc outg retr
     echo -n "${QUEUECHECK}: "
     cat "${outputpath}/queuestat_${QUEUECHECK}.mon"
 done
+echo "--- SMTP message stats:"
+for SMTPSTAT in msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam
+    do
+    echo -n "$(stat -c'%y' "${outputpath}/smtpstat_${SMTPSTAT}.mon") - "
+    echo -n "${SMTPSTAT}: "
+    cat "${outputpath}/smtpstat_${SMTPSTAT}.mon"
+done
 echo "--- WebClient and ActiveSync:"
 echo -n "$(stat -c'%y' "${outputpath}/wcstatus.mon") - "
 echo -n "WebClient login: "
@@ -483,7 +594,7 @@ function printUsage() {
 
 Synopsis
     iwmon.sh setup
-    checks and installs dependencies
+    checks and installs dependencies, sets initial runtime configuration
  
     iwmon.sh check_name [ check_parameter ]
     supported health-checks: cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
@@ -493,6 +604,10 @@ Synopsis
     
     iwmon.sh queuestat [ smtp_queue_name ]
     available queues: inc ( incoming ), outg ( outgoing ), retr ( outgoing-retry )
+    
+    iwmon.sh connstat [ smtp_msg_stat_name ]
+    available smtp stats: msgout, msgin, msgfail, msgfaildata, msgfailvirus, msgfailcf, msgfailextcf, msgfailrule
+    ( for more details, see https://esupport.icewarp.com/index.php?/Knowledgebase/Article/View/180/16/snmp-in-icewarp )
     
     iwmon.sh all silent/verbose
     get all stats in one run and optionally print the stats to STDOUT
@@ -535,14 +650,14 @@ queuestat) queuestat "${2}";
 all) if [[ "${2}" == "verbose" ]]
         then
         smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfsmntstat;cfgstat;
-        for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
+        for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
         smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfscheck;cfgcheck;
-        for STATNAME in smtp imap xmpp grw http; do connstat "${STATNAME}";done;
+        for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
      if [[ "${2}" != "verbose" ]]
