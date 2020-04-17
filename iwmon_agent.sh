@@ -48,6 +48,7 @@ pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
 nfstestfile="/mnt/data-nfs/check.txt"                        # path to nfs mount test file ( must exist )
 /usr/bin/touch "${scriptdir}/iwmon.cfg"
+/usr/bin/chmod 600 "${scriptdir}/iwmon.cfg"
 
 #FUNC
 # write setting to configfile
