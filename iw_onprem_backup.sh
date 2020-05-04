@@ -8,7 +8,6 @@ mkdir -p ${backuppath}
 mkdir -p ${scriptdir}/logs
 backupsrvhost="${1}" # if we take backups from another host
 backupsrvport="${2}" # than the one we connect to
-cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<cloudplanislive>).*(?=</cloudplanislive>)' -o -m 1)
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
 
