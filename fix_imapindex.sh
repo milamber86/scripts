@@ -53,6 +53,12 @@ if [[ "${tmpImapFolder}" =~ ^INBOX ]] ; then
    else
   imapFolder="${tmpImapFolder}"
 fi
+if [[ "${tmpImapFolder}" =~ \.$ ]] ; then
+  local hexImapFolder="$(echo "${tmpImapFolder}" | tr -d '\n' | xxd -ps -c 200)";
+  local imapFolder="enc~${hexImapFolder}";
+   else
+  imapFolder="${tmpImapFolder}"
+fi
 # get number of messages in given imap folder
 local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
@@ -87,9 +93,9 @@ function prepFolderRestore # ( 1: user@email, 2: full path to folder )
 local dstPath="${2}";
 local fmPath="$(getFullMailboxPath ${1})";
 local iwmPath="$(echo ${dstPath} | sed -r "s|${mntPrefixPath}||")";
-local srcPath="${mntPrefixPath}${backupPrefixPath}${iwmPath}";
+local srcPath="${mntPrefixPath}${backupPrefixPath}/${iwmPath}";
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
-/usr/bin/cp -fv "${srcPath}${indexFileName}" "${dstPath}${tmpPrefix}${indexFileName}"
+/usr/bin/cp -fv "${srcPath}/${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
 echo "${dstPath}" >> "${tmpFile}"
 }
 
