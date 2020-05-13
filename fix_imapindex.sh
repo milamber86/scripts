@@ -97,9 +97,13 @@ local dstPath="${2}";
 local fmPath="$(getFullMailboxPath ${1})";
 local iwmPath="$(echo ${dstPath} | sed -r "s|${mntPrefixPath}||")";
 local srcPath="${mntPrefixPath}${backupPrefixPath}/${iwmPath}";
+if [[ (-f "${dstPath}") && (-f "${srcPath}") ]]; then
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
 /usr/bin/cp -fv "${srcPath}/${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
 echo "${dstPath}" >> "${tmpFile}"
+  else
+  echo "Error copying files, src: ${srcPath} or dst: ${dstPath} does not exist."
+fi
 }
 
 function indexRename # ( 1: full path to folder )
@@ -140,10 +144,10 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-    echo "User ${1}, folder ${cmdResult} FAIL"
+    echo "FAIL - User: ${1}, folder: ${i}, fullpath: ${cmdResult}."
     prepFolderRestore "${1}" "${cmdResult}"
           else
-    echo "OK - User ${1}, ${cmdResult} msgs, folder ${i}."
+    echo "OK - User: ${1}, ${cmdResult} msgs, folder: ${i}."
   fi
 done
 if [[ -f "${tmpFile}" ]]; then
