@@ -44,20 +44,23 @@ if [[ ! -d "${cmdResult}" ]] ; then
 fi
 }
 
-function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK/full folder path if NOK )
+function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - full folder path )
 {
 local fmPath="$(getFullMailboxPath ${1})";
 tmpImapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
 if [[ "${tmpImapFolder}" =~ ^INBOX ]] ; then
-  local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|INBOX|inbox|')";
-   else
-  imapFolder="${tmpImapFolder}"
-fi
-if [[ "${tmpImapFolder}" =~ \.$ ]] ; then
+local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|INBOX|inbox|')";
+  else
+  if [[ "${tmpImapFolder}" =~ \.$ ]] ; then
   local hexImapFolder="$(echo "${tmpImapFolder}" | tr -d '\n' | xxd -ps -c 200)";
   local imapFolder="enc~${hexImapFolder}";
-   else
-  imapFolder="${tmpImapFolder}"
+    else
+    if [[ "${tmpImapFolder}" =~ ^Spam ]] ; then
+    local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|Spam|~spam|')";
+      else
+      imapFolder="${tmpImapFolder}"
+    fi
+  fi
 fi
 # get number of messages in given imap folder
 local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
@@ -84,7 +87,7 @@ fi
 if [[ ${imapResult} -ne ${fsResult} ]] ; then
     echo "${fmPath}${imapFolder}/";return 1;
         else
-    echo "OK.";return 0;
+    echo "${imapResult}";return 0;
 fi
 }
 
@@ -140,7 +143,7 @@ do
     echo "User ${1}, folder ${cmdResult} FAIL"
     prepFolderRestore "${1}" "${cmdResult}"
           else
-    echo "User ${1}, folder ${i} OK"
+    echo "OK - User ${1}, ${cmdResult} msgs, folder ${i}."
   fi
 done
 if [[ -f "${tmpFile}" ]]; then
