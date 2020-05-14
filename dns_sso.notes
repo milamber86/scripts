@@ -1,54 +1,56 @@
 --- DNS
-Návod na nastavení DNS záznamů pro mail doménu examplesomewhere.cz:
+Návod na nastavení DNS záznamů pro mail doménu examplesomewhere.com:
 -- A
-DNS A 3600 example.somewhere.cz -> 66.77.88.99
+DNS A 3600 example.somewhere.com -> 66.77.88.99
 -- MX
-DNS MX 3600 0 @examplesomewhere.cz -> example.somewhere.cz
+DNS MX 3600 0 @examplesomewhere.com -> example.somewhere.com
 -- A autodiscover
-SmartDiscover (A) 'autodiscover.examplesomewhere.cz':
-A 3600 autodiscover.examplesomewhere.cz -> 66.77.88.99
+SmartDiscover (A) 'autodiscover.examplesomewhere.com':
+A 3600 autodiscover.examplesomewhere.com -> 66.77.88.99
 -- SRV autodiscover
-SmartDiscover (SRV) '_autodiscover._tcp.examplesomewhere.cz':
-SRV 10 0 443 example.somewhere.cz
+SmartDiscover (SRV) '_autodiscover._tcp.examplesomewhere.com':
+SRV 10 0 443 example.somewhere.com
 -- SRV caldav
-WebDAV (SRV) '_caldav._tcp.examplesomewhere.cz':
-SRV 10 0 80 example.somewhere.cz
-WebDAV (SRV) '_caldavs._tcp.examplesomewhere.cz':
-SRV 10 0 443 example.somewhere.cz
+WebDAV (SRV) '_caldav._tcp.examplesomewhere.com':
+SRV 10 0 80 example.somewhere.com
+WebDAV (SRV) '_caldavs._tcp.examplesomewhere.com':
+SRV 10 0 443 example.somewhere.com
 -- SRV carddav
-WebDAV (SRV) '_carddav._tcp.examplesomewhere.cz':
-SRV 10 0 80 example.somewhere.cz
-WebDAV (SRV) '_carddavs._tcp.examplesomewhere.cz':
-SRV 10 0 443 example.somewhere.cz
+WebDAV (SRV) '_carddav._tcp.examplesomewhere.com':
+SRV 10 0 80 example.somewhere.com
+WebDAV (SRV) '_carddavs._tcp.examplesomewhere.com':
+SRV 10 0 443 example.somewhere.com
 -- SRV instant messaging
-Instant Messaging (SRV) '_xmpp-server._tcp.examplesomewhere.cz':
-SRV 10 0 5222 example.somewhere.cz
-Instant Messaging (SRV) '_xmpp-client._tcp.examplesomewhere.cz':
-SRV 10 0 5222 example.somewhere.cz
+Instant Messaging (SRV) '_xmpp-server._tcp.examplesomewhere.com':
+SRV 10 0 5222 example.somewhere.com
+Instant Messaging (SRV) '_xmpp-client._tcp.examplesomewhere.com':
+SRV 10 0 5222 example.somewhere.com
 --SRV iSchedule (Apple Mac)
-iSchedule (SRV) '_ischedule._tcp.examplesomewhere.cz':
-SRV 10 10 443 example.somewhere.cz
+iSchedule (SRV) '_ischedule._tcp.examplesomewhere.com':
+SRV 10 10 443 example.somewhere.com
 
 
 --- SSO
-IW server hostname: example.somewhere.cz 
-email domain: examplesomewhere.cz
+IW server hostname: example.somewhere.com 
+email domain: examplesomewhere.com
 AD domain:    SOMEWHERE.LOCAL
 
-- vytvorit pro kazdy keytab jednoho usera v default OU=USERS,DC=SOMEWHERE,DC=LOCAL a nastavit example heslo somepass1234
+- vytvorit pro kazdy keytab jednoho domain usera v default OU=USERS,DC=SOMEWHERE,DC=LOCAL a nastavit example heslo somepass1234
 ice_http
 ice_imap
 ice_xmpp
 ice_smtp
 
-- vygenerovat keytaby na vytvorene usery
-ktpass /out HTTP#example.somewhere.cz@SOMEWHERE.LOCAL /princ HTTP/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_http /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
-ktpass /out imap#example.somewhere.cz@SOMEWHERE.LOCAL /princ imap/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_imap /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
-ktpass /out xmpp#example.somewhere.cz@SOMEWHERE.LOCAL /princ xmpp/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_xmpp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
-ktpass /out smtp#example.somewhere.cz@SOMEWHERE.LOCAL /princ smtp/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_smtp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+- na AD v cmd.exe admina vygenerovat keytaby na v predchozim kroku vytvorene usery
+ktpass /out HTTP#example.somewhere.com@SOMEWHERE.LOCAL /princ HTTP/example.somewhere.com@SOMEWHERE.LOCAL /mapuser ice_http /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out imap#example.somewhere.com@SOMEWHERE.LOCAL /princ imap/example.somewhere.com@SOMEWHERE.LOCAL /mapuser ice_imap /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out xmpp#example.somewhere.com@SOMEWHERE.LOCAL /princ xmpp/example.somewhere.com@SOMEWHERE.LOCAL /mapuser ice_xmpp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out smtp#example.somewhere.com@SOMEWHERE.LOCAL /princ smtp/example.somewhere.com@SOMEWHERE.LOCAL /mapuser ice_smtp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
 
-- zapnute GSSAPI
-- platny certifikat na example.somewhere.cz a autodiscover.examplesomewhere.cz
+checklist:
+- zapnute GSSAPI na IW v system-advanced
+- na domene examplesomewhere.com v IceWarp v directory service,Kerberos/GSSAPI/SSO,Service name nastaveno example.somewhere.com@SOMEWHERE.LOCAL
+- platny certifikat na example.somewhere.com a autodiscover.examplesomewhere.com
 - srv zaznamy pro:
-_autodiscover._tcp.example.somewhere.cz -> 10 10 443 example.somewhere.cz
-_autodiscover._tcp.SOMEWHERE.LOCAL -> 10 10 443 example.somewhere.cz
+_autodiscover._tcp.example.somewhere.com -> 10 10 443 example.somewhere.com
+_autodiscover._tcp.SOMEWHERE.LOCAL -> 10 10 443 example.somewhere.com
