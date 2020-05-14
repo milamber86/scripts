@@ -1,0 +1,53 @@
+--- DNS
+Návod na nastavení DNS záznamů pro mail doménu examplesomewhere.cz:
+-- A
+DNS A 3600 example.somewhere.cz -> 66.77.88.99
+-- MX
+DNS MX 3600 0 @examplesomewhere.cz -> example.somewhere.cz
+-- A autodiscover
+SmartDiscover (A) 'autodiscover.examplesomewhere.cz':
+A 3600 autodiscover.examplesomewhere.cz -> 66.77.88.99
+-- SRV autodiscover
+SmartDiscover (SRV) '_autodiscover._tcp.examplesomewhere.cz':
+SRV 10 0 443 example.somewhere.cz
+-- SRV caldav
+WebDAV (SRV) '_caldav._tcp.examplesomewhere.cz':
+SRV 10 0 80 example.somewhere.cz
+WebDAV (SRV) '_caldavs._tcp.examplesomewhere.cz':
+SRV 10 0 443 example.somewhere.cz
+-- SRV carddav
+WebDAV (SRV) '_carddav._tcp.examplesomewhere.cz':
+SRV 10 0 80 example.somewhere.cz
+WebDAV (SRV) '_carddavs._tcp.examplesomewhere.cz':
+SRV 10 0 443 example.somewhere.cz
+-- SRV instant messaging
+Instant Messaging (SRV) '_xmpp-server._tcp.examplesomewhere.cz':
+SRV 10 0 5222 example.somewhere.cz
+Instant Messaging (SRV) '_xmpp-client._tcp.examplesomewhere.cz':
+SRV 10 0 5222 example.somewhere.cz
+--SRV iSchedule (Apple Mac)
+iSchedule (SRV) '_ischedule._tcp.examplesomewhere.cz':
+SRV 10 10 443 example.somewhere.cz
+
+
+--- SSO
+IW server hostname: example.somewhere.cz 
+email domain: examplesomewhere.cz
+AD domain:    SOMEWHERE.LOCAL
+
+- vytvorit pro kazdy keytab jednoho usera v default OU=USERS,DC=SOMEWHERE,DC=LOCAL a nastavit example heslo somepass1234
+ice_http
+ice_imap
+ice_xmpp
+ice_smtp
+
+- vygenerovat keytaby na vytvorene usery
+ktpass /out HTTP#example.somewhere.cz@SOMEWHERE.LOCAL /princ HTTP/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_http /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out imap#example.somewhere.cz@SOMEWHERE.LOCAL /princ imap/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_imap /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out xmpp#example.somewhere.cz@SOMEWHERE.LOCAL /princ xmpp/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_xmpp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+ktpass /out smtp#example.somewhere.cz@SOMEWHERE.LOCAL /princ smtp/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_smtp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
+
+- zapnute GSSAPI
+- srv zaznamy pro:
+_autodiscover._tcp.example.somewhere.cz -> 10 10 443 example.somewhere.cz
+_autodiscover._tcp.SOMEWHERE.LOCAL -> 10 10 443 example.somewhere.cz
