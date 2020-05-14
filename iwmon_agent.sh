@@ -1,5 +1,5 @@
-#!/bin/sh
-# iwmon.sh
+#!/bin/bash
+# iwmon_agent.sh
 # IceWarp monitoring for Zabbix
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
