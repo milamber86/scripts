@@ -48,6 +48,7 @@ ktpass /out xmpp#example.somewhere.cz@SOMEWHERE.LOCAL /princ xmpp/example.somewh
 ktpass /out smtp#example.somewhere.cz@SOMEWHERE.LOCAL /princ smtp/example.somewhere.cz@SOMEWHERE.LOCAL /mapuser ice_smtp /crypto all /ptype KRB5_NT_PRINCIPAL /pass somepass1234
 
 - zapnute GSSAPI
+- platny certifikat na example.somewhere.cz a autodiscover.examplesomewhere.cz
 - srv zaznamy pro:
 _autodiscover._tcp.example.somewhere.cz -> 10 10 443 example.somewhere.cz
 _autodiscover._tcp.SOMEWHERE.LOCAL -> 10 10 443 example.somewhere.cz
