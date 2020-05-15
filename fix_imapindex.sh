@@ -13,6 +13,7 @@
 # global vars
 myDate="$(date +%m%d%y-%H%M)";
 ctimeout=30; # connection and idle timeout for netcat
+iwserver="127.0.0.1";
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 tmpFile="/root/imapindextmp.txt";
@@ -92,7 +93,7 @@ if [[ ${imapResult} -ne ${fsResult} ]] ; then
 fi
 }
 
-function testWcFolder # ( 1: user@email, 2: imap folder name )
+function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messages in wc cache )
 {
 local folderEncName="$(echo ${2} | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "${folderEncName}")";
@@ -152,38 +153,35 @@ function rawurlencode() {
   echo "${encoded}"
 }
 
-function refreshWcFolder # ( 1: user@email, 2: imap folder name )
+function refreshWcFolder # ( 1: user@email, 2: password, 3: imap folder name )
 {
+local folderEncName="$(echo ${3} | sed -r 's|"||g')";
+local folderName="$(python imapcode.py "${folderEncName}")";
 local email="${1}";
 local pass="${2}";
 # get auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
-if [ -z "${wcatoken}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 1 fail - Error getting webclient auth token from control";return 1;fi
+##echo "1: ${wcatoken}"
 # get phpsessid
 local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
-if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error getting php session ID";return 1;fi
+##echo "2: ${wcphpsessid}"
 # auth wc session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
 local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
-if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error logging to the webclient";return 1;fi
+##echo "3: ${wcsid}"
+
 # refresh folders standard account start
 local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
-local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
-  if [[ "${response}" =~ "INBOX" ]];
-    then
-    local freturn=OK
-    else
-    local freturn=FAIL
-  fi # refresh folders standard account end
+local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
+##echo "4: ${response}"
+# folder refresh
+local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"734012818541404900158955161135\" type=\"get\" format=\"xml\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${folderName}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>68</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
+local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
+##echo "5: ${response}"
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
-local end=`date +%s%N | cut -b1-13`
-local runtime=$((end-start))
-echo "${freturn}" > ${outputpath}/wcstatus.mon;
-echo "${runtime}" > ${outputpath}/wcruntime.mon;
-if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
 function prepFolderRestore # ( 1: user@email, 2: full path to folder )
@@ -245,18 +243,22 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
     echo "FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}."
-    echo "-----------------------------------------------"
+ #   echo "-----------------------------------------------"
     prepFolderRestore "${1}" "${cmdResult}"
           else
-    echo "   OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+ ##   echo "   OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}."
     imapCnt=${cmdResult};
     cmdResult="$(testWcFolder "${1}" "${i}")";
     if [[ $cmdResult -ne ${imapCnt} ]] ; then
     echo "FAIL WC - User: ${1}, folder: ${i}, wc cache/imap have: ${cmdResult} / ${imapCnt} msgs.";
-    echo "-----------------------------------------------"
-#    fixWcFolder "${1}" "${i}";
+#    echo "-----------------------------------------------"
+    fixWcFolder "${1}" "${i}";
+    refreshWcFolder "${1}" "${2}" "${i}";
+    cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+    echo "Status after repair: folder: ${i}, wc cache have: ${cmdResult} msgs.";
       else
-      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+      sleep 0
+##      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
     fi
   fi
 done
