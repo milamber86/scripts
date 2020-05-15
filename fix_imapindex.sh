@@ -186,30 +186,6 @@ echo "${runtime}" > ${outputpath}/wcruntime.mon;
 if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
-# iw ActiveSync client login healthcheck
-function eascheck() # ( -> status OK, FAIL; time spent in ms )
-{
-local USER=$(readcfg "EASUser");
-local PASS=$(readcfg "EASPass");
-local aVER=$(readcfg "EASVers");
-local FOLDER="${EASFOLDER}";
-local aURI="000EASHealthCheck000"
-local aTYPE="IceWarpAnnihilator"
-local start=`date +%s%N | cut -b1-13`
-local result=`/usr/bin/curl -s -k --connect-timeout ${ctimeout} -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
-local end=`date +%s%N | cut -b1-13`
-local runtime=$((end-start))
-if [[ $result == *$FOLDER* ]]
-then
-local freturn=OK
-else
-local freturn=FAIL
-fi
-echo "${freturn}" > ${outputpath}/easstatus.mon;
-echo "${runtime}" > ${outputpath}/easruntime.mon;
-if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
-}
-
 function prepFolderRestore # ( 1: user@email, 2: full path to folder )
 {
 local dstPath="${2}";
