@@ -270,5 +270,6 @@ do
                        ##      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
                       continue;
           fi
+   fi
 done
 exit 0
