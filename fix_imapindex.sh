@@ -23,7 +23,7 @@ backupPrefixPath="/.zfs/snapshot/20200512-0024";
 mntPrefixPath="/mnt/data-nfs";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
-excludePattern='^"Public Folders|^"Archive|"Notes';
+excludePattern='^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 
