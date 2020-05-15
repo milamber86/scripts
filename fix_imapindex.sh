@@ -23,6 +23,7 @@ backupPrefixPath="/.zfs/snapshot/20200512-0024";
 mntPrefixPath="/mnt/data-nfs";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
+excludePattern='^"Public Folders|^"Archive|"Notes';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 
@@ -33,7 +34,7 @@ echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
   echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult}";return 1;
     else
-  echo "${cmdResult}" | egrep -v "Completed";
+  echo "${cmdResult}" | egrep -v "Completed" | egrep -v "${excludePattern}";
   return 0;
 fi
 }
@@ -264,7 +265,7 @@ do
           echo "FAIL WC - User: ${1}, folder: ${i}, wc cache/imap have: ${cmdResult} / ${imapCnt} msgs.";
           fixWcFolder "${1}" "${i}";
           refreshWcFolder "${1}" "${2}" "${i}";
-          cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+          cmdResult=$(testWcFolder "${1}" "${i}");
           echo "Status after repair: folder: ${i}, wc cache have: ${cmdResult} msgs.";
                       else
                        ##      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
