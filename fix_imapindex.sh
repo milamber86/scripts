@@ -7,7 +7,8 @@
 #
 #  Tests all imap folders for given username/password for broken index
 #  and restores indexes from backup if the index is broken.
-#
+#  Tests webclient cache item count against imap folder, if not equal,
+#  triggers webclient cache update or clear and full folder refresh.
 
 # global vars
 myDate="$(date +%m%d%y-%H%M)";
@@ -21,6 +22,8 @@ backupPrefixPath="/.zfs/snapshot/20200512-0024";
 mntPrefixPath="/mnt/data-nfs";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
+re='^[0-9]+$'; # "number" regex for results comparison
+dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list excluding archive folders )
 {
@@ -65,8 +68,6 @@ fi
 # get number of messages in given imap folder
 local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
-# "number" regex for results comparison
-re='^[0-9]+$'
 # test imap returned integer in number of messages in folder test, if not, plan index restore
 if ! [[ $cmdResult =~ $re ]] ; then
     echo "${fmPath}${imapFolder}/";return 1;
@@ -91,6 +92,124 @@ if [[ ${imapResult} -ne ${fsResult} ]] ; then
 fi
 }
 
+function testWcFolder # ( 1: user@email, 2: imap folder name )
+{
+local folderEncName="$(echo ${2} | sed -r 's|"||g')";
+local folderName="$(python imapcode.py "${folderEncName}")";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local folderDbId="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+local dbQuery="$(echo -e "select count(*) from item where folder_id = ${folderDbId};")";
+local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v count | tr -dc [:print:])";
+if ! [[ $dbResult =~ $re ]] ; then
+echo "Failed to get number of messages for ${1}, folder ${2} from the webclient database.";return 1;
+  else
+  echo "${dbResult}";return 0;
+fi
+}
+
+function fixWcFolder # ( 1: user@email, 2: imap folder name )
+{
+local folderEncName="$(echo ${2} | sed -r 's|"||g')";
+local folderName="$(python imapcode.py "${folderEncName}")";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local folderDbId="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+local dbQuery="$(echo -e "update folder set sync_update=0 where folder_id = ${folderDbId};")";
+#local dbQuery="$(echo -e "update folder set uid_validity=NULL, sync_update=0 where folder_id = ${folderDbId};")";
+local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
+# todo test db result
+}
+
+function resetWcFolder # ( 1: user@email, 2: imap folder name )
+{
+local folderEncName="$(echo ${2} | sed -r 's|"||g')";
+local folderName="$(python imapcode.py "${folderEncName}")";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local folderDbId="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+local dbQuery="$(echo -e "delete from item where folder_id = ${folderDbId};")";
+local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
+# todo test db result
+local dbQuery="$(echo -e "update folder set uid_validity=NULL, sync_update=0 where folder_id = ${folderDbId};")";
+#local dbQuery="$(echo -e "update folder set uid_validity=NULL, sync_update=0 where folder_id = ${folderDbId};")";
+local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
+# todo test db result
+}
+
+# urlencode string
+function rawurlencode() {
+  local string="${1}"
+  local strlen=${#string}
+  local encoded=""
+  local pos c o
+
+  for (( pos=0 ; pos<strlen ; pos++ )); do
+     c=${string:$pos:1}
+     case "$c" in
+        [-_.~a-zA-Z0-9] ) o="${c}" ;;
+        * )               printf -v o '%%%02x' "'$c"
+     esac
+     encoded+="${o}"
+  done
+  echo "${encoded}"
+}
+
+function refreshWcFolder # ( 1: user@email, 2: imap folder name )
+{
+local email="${1}";
+local pass="${2}";
+# get auth token
+local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
+local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+if [ -z "${wcatoken}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 1 fail - Error getting webclient auth token from control";return 1;fi
+# get phpsessid
+local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error getting php session ID";return 1;fi
+# auth wc session
+local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
+local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error logging to the webclient";return 1;fi
+# refresh folders standard account start
+local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
+local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
+  if [[ "${response}" =~ "INBOX" ]];
+    then
+    local freturn=OK
+    else
+    local freturn=FAIL
+  fi # refresh folders standard account end
+# session logout
+local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
+curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
+local end=`date +%s%N | cut -b1-13`
+local runtime=$((end-start))
+echo "${freturn}" > ${outputpath}/wcstatus.mon;
+echo "${runtime}" > ${outputpath}/wcruntime.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
+}
+
+# iw ActiveSync client login healthcheck
+function eascheck() # ( -> status OK, FAIL; time spent in ms )
+{
+local USER=$(readcfg "EASUser");
+local PASS=$(readcfg "EASPass");
+local aVER=$(readcfg "EASVers");
+local FOLDER="${EASFOLDER}";
+local aURI="000EASHealthCheck000"
+local aTYPE="IceWarpAnnihilator"
+local start=`date +%s%N | cut -b1-13`
+local result=`/usr/bin/curl -s -k --connect-timeout ${ctimeout} -m ${ctimeout} --basic --user "$USER:$PASS" -H "Expect: 100-continue" -H "Host: $HOST" -H "MS-ASProtocolVersion: ${aVER}" -H "Connection: Keep-Alive" -A "${aTYPE}" --data-binary @${scriptdir}/activesync.txt -H "Content-Type: application/vnd.ms-sync.wbxml" "https://$HOST/Microsoft-Server-ActiveSync?User=$USER&DeviceId=$aURI&DeviceType=$aTYPE&Cmd=FolderSync" | strings`
+local end=`date +%s%N | cut -b1-13`
+local runtime=$((end-start))
+if [[ $result == *$FOLDER* ]]
+then
+local freturn=OK
+else
+local freturn=FAIL
+fi
+echo "${freturn}" > ${outputpath}/easstatus.mon;
+echo "${runtime}" > ${outputpath}/easruntime.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
+}
+
 function prepFolderRestore # ( 1: user@email, 2: full path to folder )
 {
 local dstPath="${2}";
@@ -102,7 +221,7 @@ echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstP
 /usr/bin/cp -fv "${srcPath}/${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
 echo "${dstPath}" >> "${tmpFile}"
   else
-  echo "Error copying files, src: ${srcPath} or dst: ${dstPath} does not exist."
+  echo "Error copying files, either src: ${srcPath} or dst: ${dstPath} does not exist."
 fi
 }
 
@@ -116,7 +235,7 @@ echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
 return ${?}
 }
 
-function indexRestore # ()
+function indexFix # ()
 {
 ${toolSh} set system C_System_Tools_WatchDog_POP3 0
 ${icewarpdSh} --stop pop3
@@ -133,6 +252,11 @@ ${toolSh} set system C_Accounts_Global_Accounts_DirectoryCache_RefreshNow 1
 }
 
 # main
+if [[ ! -f imapcode.py ]]; then
+yum -y install python python-six
+wget https://mail.icewarp.cz/imapcode.py
+chmod u+x imapcode.py
+fi
 rm -fv "${tmpFile}"
 cmdResult=$(imapFolderList "${1}" "${2}");
 if [[ ${?} -ne 0 ]] ; then
@@ -144,13 +268,23 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-    echo "FAIL - User: ${1}, folder: ${i}, fullpath: ${cmdResult}."
+    echo "FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}."
+    echo "-----------------------------------------------"
     prepFolderRestore "${1}" "${cmdResult}"
           else
-    echo "OK - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+    echo "   OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+    imapCnt=${cmdResult};
+    cmdResult="$(testWcFolder "${1}" "${i}")";
+    if [[ $cmdResult -ne ${imapCnt} ]] ; then
+    echo "FAIL WC - User: ${1}, folder: ${i}, wc cache/imap have: ${cmdResult} / ${imapCnt} msgs.";
+    echo "-----------------------------------------------"
+#    fixWcFolder "${1}" "${i}";
+      else
+      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+    fi
   fi
 done
-if [[ -f "${tmpFile}" ]]; then
-  indexRestore
-fi
+#if [[ -f "${tmpFile}" ]]; then
+#  indexFix
+#fi
 exit 0
