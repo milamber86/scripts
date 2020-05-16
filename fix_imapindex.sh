@@ -23,7 +23,7 @@ backupPrefixPath="/.zfs/snapshot/20200512-0024";
 mntPrefixPath="/mnt/data-nfs";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
-wcCacheRetry=50;
+wcCacheRetry=100;
 excludePattern='^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
@@ -303,6 +303,3 @@ do
    fi
 done
 exit 0
-
-# TODO
-# 1/ log failed to file
