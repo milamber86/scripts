@@ -58,8 +58,10 @@ if [[ "${tmpImapFolder}" =~ ^INBOX ]] ; then
 local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|INBOX|inbox|')";
   else
   if [[ "${tmpImapFolder}" =~ \.$ ]] ; then
+  local tmpFolderPrefix="$(echo ${tmpImapFolder} | perl -pe 's|^(.*)/(.*?)$|\1|')";
+  local tmpImapFolder="$(echo ${tmpImapFolder} | perl -pe 's|^(.*)/(.*?)$|\2|')";
   local hexImapFolder="$(echo "${tmpImapFolder}" | tr -d '\n' | xxd -ps -c 200)";
-  local imapFolder="enc~${hexImapFolder}";
+  local imapFolder="${tmpFolderPrefix}/enc~${hexImapFolder}";
     else
     if [[ "${tmpImapFolder}" =~ ^Spam ]] ; then
     local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|Spam|~spam|')";
