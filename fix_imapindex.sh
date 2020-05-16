@@ -23,6 +23,7 @@ backupPrefixPath="/.zfs/snapshot/20200512-0024";
 mntPrefixPath="/mnt/data-nfs";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
+wcCacheRetry=50;
 excludePattern='^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
@@ -252,6 +253,7 @@ done
 if [[ -f "${tmpFile}" ]]; then
   indexFix
 fi
+refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
 for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
@@ -262,11 +264,16 @@ do
           imapCnt=${cmdResult};
           cmdResult="$(testWcFolder "${1}" "${i}")";
           if [[ $cmdResult -ne ${imapCnt} ]] ; then
-          echo "FAIL WC - User: ${1}, folder: ${i}, wc cache/imap have: ${cmdResult} / ${imapCnt} msgs.";
-          fixWcFolder "${1}" "${i}";
-          refreshWcFolder "${1}" "${2}" "${i}";
-          cmdResult=$(testWcFolder "${1}" "${i}");
-          echo "Status after repair: folder: ${i}, wc cache have: ${cmdResult} msgs.";
+          echo "FAIL WC - User: ${1}, folder: ${i}, wc cache / imap have: ${cmdResult} / ${imapCnt} msgs.";
+          for j in $(seq 1 $wcCacheRetry);
+            do
+            fixWcFolder "${1}" "${i}";
+            refreshWcFolder "${1}" "${2}" "${i}";
+            cmdResult=$(testWcFolder "${1}" "${i}");
+            echo "Status after repair cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+            if [[ $cmdResult -eq ${imapCnt} ]] ; then break ; fi
+            sleep 15;
+            done
                       else
                        ##      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
                       continue;
