@@ -138,6 +138,16 @@ local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
 # todo test db result
 }
 
+function resetWcUser # ( 1: user@email )
+{
+local dbQuery="$(echo -e "delete from item where folder_id in (select folder_id from folder where account_id = \x27${1}\x27;")";
+local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
+# todo test db result
+local dbQuery="$(echo -e "delete from folder where account_id = \x27${1}\x27;")";
+local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
+# todo test db result
+}
+
 # urlencode string
 function rawurlencode() {
   local string="${1}"
@@ -165,22 +175,28 @@ local pass="${2}";
 # get auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+if [[ "${wcatoken}" =~ "500 Internal Server Error" ]] ; then echo "${wcatoken}";return 1; fi
  ## echo "1: ${wcatoken}"
 # get phpsessid
 local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+if [[ "${wcphpsessid}" =~ "500 Internal Server Error" ]] ; then echo "${wcphpsessid}";return 1; fi
  ## echo "2: ${wcphpsessid}"
 # auth wc session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
 local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+if [[ "${wcsid}" =~ "500 Internal Server Error" ]] ; then echo "${wcsid}";return 1; fi
 ## echo "3: ${wcsid}"
 
 # refresh folders standard account start
 local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
 local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
+if [[ "${response}" =~ "500 Internal Server Error" ]] ; then echo "${response}";return 1; fi
  ## echo "4: ${response}"
 # folder refresh
-local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"734012818541404900158955161135\" type=\"get\" format=\"xml\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${folderName}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>68</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
+local folderAmpEnc="$(echo "${folderName}" | sed -r 's|&|&amp;|g')";
+local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"734012818541404900158955161135\" type=\"get\" format=\"xml\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${folderAmpEnc}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>68</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
 local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
+if [[ "${response}" =~ "500 Internal Server Error" ]] ; then echo "${response}";return 1; fi
  ## echo "5: ${response}"
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
@@ -256,6 +272,8 @@ if [[ -f "${tmpFile}" ]]; then
   indexFix
 fi
 refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
+cmdResult="$(testWcFolder "${1}" "INBOX")";
+if [[ $? -ne 0 ]] ; then resetWcUser "${1}"; fi
 for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
@@ -265,12 +283,14 @@ do
           else
           imapCnt=${cmdResult};
           cmdResult="$(testWcFolder "${1}" "${i}")";
+          if [[ $? -ne 0 ]] ; then resetWcFolder "${1}" "${i}"; fi
           if [[ $cmdResult -ne ${imapCnt} ]] ; then
           echo "FAIL WC - User: ${1}, folder: ${i}, wc cache / imap have: ${cmdResult} / ${imapCnt} msgs.";
           for j in $(seq 1 $wcCacheRetry);
             do
             fixWcFolder "${1}" "${i}";
             refreshWcFolder "${1}" "${2}" "${i}";
+            if [[ $? -ne 0 ]] ; then echo "FAIL WC 2nd time - User: ${1}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
             cmdResult=$(testWcFolder "${1}" "${i}");
             echo "Status after repair cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
             if [[ $cmdResult -eq ${imapCnt} ]] ; then break ; fi
@@ -283,3 +303,6 @@ do
    fi
 done
 exit 0
+
+# TODO
+# 1/ log failed to file
