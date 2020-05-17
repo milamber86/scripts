@@ -119,7 +119,7 @@ function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messag
 local tmpFolder="$(echo "${2}" | sed -r 's# #|#g')";
 local folderEncName="$(echo "${tmpFolder}" | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "$(echo "${folderEncName}" | sed -r s'#\|# #g')")";
-local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27 and path like \x27%${2}%\x27;")";
 local folderDbId="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
 local dbQuery="$(echo -e "select count(*) from item where folder_id = ${folderDbId};")";
 local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v count | tr -dc [:print:])";
