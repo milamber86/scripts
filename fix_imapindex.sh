@@ -60,7 +60,7 @@ total=${#FOLDERS[*]};
 for I in $( seq 0 $(( $total - 1 )) )
   do
   FOLDER="$(echo "${FOLDERS[$I]}" | tr -d '\n')";
-  if [[ "${FOLDER}" =~ ^INBOX ]] ; then
+  if [[ ( "${FOLDER}" =~ ^INBOX ) && ( $I -eq 0 ) ]] ; then
     FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|^INBOX$|inbox|')";
       else
       if [[ ( "${FOLDER}" =~ \.$ ) || ( "${FOLDER}" =~ \.\. ) || ( "${FOLDER}" =~ \* ) ]] ; then
