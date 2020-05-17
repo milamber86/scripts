@@ -116,17 +116,26 @@ fi
 
 function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messages in wc cache ) get number of items from wc db for given folder
 {
-local tmpFolder="$(echo "${2}" | sed -r 's# #|#g')";
-local folderEncName="$(echo "${tmpFolder}" | sed -r 's|"||g')";
+local tmpFolder="$(echo "${2}" | sed -r 's|"||g')";
+local folderEncName="$(echo "${tmpFolder}" | sed -r 's# #|#g')";
 local folderName="$(python imapcode.py "$(echo "${folderEncName}" | sed -r s'#\|# #g')")";
-local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27 and path like \x27%${2}%\x27;")";
-local folderDbId="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+if ! [[ $dbResult =~ $re ]] ; then
+  local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27 and path like \x27%${tmpFolder}%\x27;")";
+  local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+  if ! [[ $dbResult =~ $re ]] ; then
+    echo "ERROR ${dbResult}"
+    return 1;
+  fi
+fi
+local folderDbId=${dbResult}
 local dbQuery="$(echo -e "select count(*) from item where folder_id = ${folderDbId};")";
 local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v count | tr -dc [:print:])";
 if ! [[ $dbResult =~ $re ]] ; then
-echo "Failed to get number of messages for ${1}, folder ${2} from the webclient database.";return 1;
-  else
-  echo "${dbResult}";return 0;
+  echo "Failed to get number of messages for ${1}, folder ${2} from the webclient database.";return 1;
+    else
+    echo "${dbResult}";return 0;
 fi
 }
 
@@ -310,9 +319,8 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
     if [[ ${?} -ne 0 ]] ; then
     echo "FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
-    echo "${cmdResult}" >> "${logFiled}"
+    echo "${cmdResult}" >> "${logFailed}"
     fi
-  continue
           else
           imapCnt=${cmdResult};
           cmdResult="$(testWcFolder "${1}" "${i}")";
