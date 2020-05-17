@@ -29,7 +29,7 @@ re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 logFailed="/root/logFailed_fix";
 
-function imapFolderList # ( 1: login email, 2: password -> imap folders list excluding archive folders )
+function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
 {
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${iwArchivePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
@@ -41,7 +41,7 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 }
 
-function getFullMailboxPath # ( 1: user@email -> full mailbox path )
+function getFullMailboxPath # ( 1: user@email -> full mailbox path ) get user full mailbox path prefix from IW api
 {
 local cmdResult="$(${toolSh} export account ${1} u_fullmailboxpath | awk -F ',' '{print $2}')"
 if [[ ! -d "${cmdResult}" ]] ; then
@@ -51,7 +51,7 @@ if [[ ! -d "${cmdResult}" ]] ; then
 fi
 }
 
-function imapFolderFsPath # ( 1: user@email, 2: imap mailbox name )
+function imapFolderFsPath # ( 1: user@email, 2: imap mailbox name -> imap mailbox full encoded fs path) get IW full fs path for imap mailbox
 {
 local fmPath="$(getFullMailboxPath ${1})";
 IFS='/' read -ra FOLDERS <<< $(echo "${2}" | sed -r 's|"||g')
@@ -81,7 +81,8 @@ IFS=\/ eval 'lst="${FOLDERS[*]}"'
 echo "${fmPath}/${lst}" | sed -r 's#//#/#g' | tr -dc [:print:]
 }
 
-function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - full folder path )
+# test if imap reports the same number of messages in SELECT <mailbox> EXISTS response as the number of messages in folder on filesystem
+function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - imap mailbox full encoded fs path )
 {
 imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
 # get number of messages in given imap folder
@@ -112,7 +113,7 @@ if [[ ${imapResult} -ne ${fsResult} ]] ; then
 fi
 }
 
-function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messages in wc cache )
+function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messages in wc cache ) get number of items from wc db for given folder
 {
 local folderEncName="$(echo ${2} | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "${folderEncName}")";
@@ -127,7 +128,7 @@ echo "Failed to get number of messages for ${1}, folder ${2} from the webclient 
 fi
 }
 
-function fixWcFolder # ( 1: user@email, 2: imap folder name )
+function fixWcFolder # ( 1: user@email, 2: imap folder name ) set folder to refresh in wc db
 {
 local folderEncName="$(echo ${2} | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "${folderEncName}")";
@@ -139,7 +140,7 @@ local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
 # todo test db result
 }
 
-function resetWcFolder # ( 1: user@email, 2: imap folder name )
+function resetWcFolder # ( 1: user@email, 2: imap folder name ) delete items for given folder, reset folder validity in wc db
 {
 local folderEncName="$(echo ${2} | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "${folderEncName}")";
@@ -153,7 +154,7 @@ local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
 # todo test db result
 }
 
-function resetWcUser # ( 1: user@email )
+function resetWcUser # ( 1: user@email ) delete whole user wc cache db
 {
 local dbQuery="$(echo -e "delete from item where folder_id in (select folder_id from folder where account_id = \x27${1}\x27;")";
 local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
@@ -181,7 +182,7 @@ function rawurlencode() {
   echo "${encoded}"
 }
 
-function refreshWcFolder # ( 1: user@email, 2: password, 3: imap folder name )
+function refreshWcFolder # ( 1: user@email, 2: password, 3: imap folder name ) simulate user folder select in webclient to trigger wc cache folder refresh
 {
 local folderEncName="$(echo ${3} | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "${folderEncName}")";
@@ -218,7 +219,7 @@ local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webm
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
 }
 
-function prepFolderRestore # ( 1: user@email, 2: full imap mailbox fs path )
+function prepFolderRestore # ( 1: user@email, 2: full imap mailbox fs path ) prepares imapindex restore from backup
 {
 local dstPath="${2}";
 local fmPath="$(getFullMailboxPath ${1})";
@@ -233,7 +234,7 @@ echo "${dstPath}" >> "${tmpFile}"
 fi
 }
 
-function indexRename # ( 1: full path to folder )
+function indexRename # ( 1: full path to folder ) rename indexes , called from indexFix
 {
 local srcName="${1}${tmpPrefix}${indexFileName}";
 local dstName="${1}${indexFileName}";
@@ -244,7 +245,7 @@ chown icewarp:icewarp "${dstName}"
 return ${?}
 }
 
-function indexFix # ( 1: user@email )
+function indexFix # ( 1: user@email ) stop imap, rename restored idx, backup original ones, restart imap
 {
 ${toolSh} set system C_System_Tools_WatchDog_POP3 0
 ${icewarpdSh} --stop pop3
