@@ -27,6 +27,7 @@ wcCacheRetry=100;
 excludePattern='^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
+logFailed="/root/logFailed_fix";
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list excluding archive folders )
 {
@@ -292,10 +293,18 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-  echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Giving up ( deleting index, triggering cache refresh )."
+  echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
   /usr/bin/rm -fv "${cmdResult}${indexFileName}";
+  /usr/bin/rm -fv "${cmdResult}flags.dat";
+  /usr/bin/rm -fv "${cmdResult}*.timestamp";
   ${icewarpdSh} --restart pop3
   ${toolSh} set account "${1}" u_directorycache_refreshnow 1
+  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+    if [[ ${?} -ne 0 ]] ; then
+    echo "FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
+    echo "${cmdResult}" >> "${logFiled}"
+    fi
   continue
           else
           imapCnt=${cmdResult};
@@ -320,8 +329,3 @@ do
    fi
 done
 exit 0
-
-# TODO
-# 1/ log failed to file
-# 2/ trencin@denbraven.sk, folder: "INBOX/MACKA/TECHNICI SV.J."
-#    richtrova@denbraven.cz, folder: "INBOX/Jana O./GTQ Ho&AWEBZQDh-lkovy"
