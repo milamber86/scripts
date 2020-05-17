@@ -16,11 +16,11 @@ ctimeout=30; # connection and idle timeout for netcat
 iwserver="127.0.0.1";
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
-tmpFile="/root/imapindextmp.txt";
+tmpFile="$(mktemp /tmp/folderrepair.XXXXXXXXX)";
 iwArchivePattern='^"Archive';
 indexFileName="imapindex.bin";
-backupPrefixPath="/.zfs/snapshot/20200512-0024";
-mntPrefixPath="/mnt/data-nfs";
+backupPrefixPath=".zfs/snapshot/keep_20200512-0024";
+mntPrefixPath="/mnt/data";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
 wcCacheRetry=100;
@@ -50,26 +50,39 @@ if [[ ! -d "${cmdResult}" ]] ; then
 fi
 }
 
-function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - full folder path )
+function imapFolderFsPath # ( 1: user@email, 2: imap mailbox name )
 {
 local fmPath="$(getFullMailboxPath ${1})";
-tmpImapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
-if [[ "${tmpImapFolder}" =~ ^INBOX ]] ; then
-local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|INBOX|inbox|')";
-  else
-  if [[ "${tmpImapFolder}" =~ \.$ ]] ; then
-  local tmpFolderPrefix="$(echo ${tmpImapFolder} | perl -pe 's|^(.*)/(.*?)$|\1|')";
-  local tmpImapFolder="$(echo ${tmpImapFolder} | perl -pe 's|^(.*)/(.*?)$|\2|')";
-  local hexImapFolder="$(echo "${tmpImapFolder}" | tr -d '\n' | xxd -ps -c 200)";
-  local imapFolder="${tmpFolderPrefix}/enc~${hexImapFolder}";
-    else
-    if [[ "${tmpImapFolder}" =~ ^Spam ]] ; then
-    local imapFolder="$(echo "${tmpImapFolder}" | sed -r s'|Spam|~spam|')";
+IFS='/' read -ra FOLDERS <<< $(echo "${2}" | sed -r 's|"||g')
+total=${#FOLDERS[*]};
+for I in $( seq 0 $(( $total - 1 )) )
+  do
+  FOLDER="$(echo "${FOLDERS[$I]}" | tr -dc [:print:])";
+  if [[ "${FOLDER}" =~ ^INBOX ]] ; then
+    FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|INBOX|inbox|')";
       else
-      imapFolder="${tmpImapFolder}"
-    fi
+      if [[ "${FOLDER}" =~ \.$ ]] ; then
+        local hexImapFolder="$(echo "${FOLDER}" | tr -d '\n' | xxd -ps -c 200)";
+        FOLDERS[$I]="enc~${hexImapFolder}";
+          else
+          if [[ "${FOLDER}" =~ ^Spam ]] ; then
+            FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|Spam|~spam|')";
+          fi
+      fi
   fi
-fi
+  done
+total=${#FOLDERS[*]};
+for I in $( seq 0 $(( $total - 1 )) )
+  do
+  FOLDERS[$I]="$(echo ${FOLDERS[$I]})/";
+  done
+IFS=\/ eval 'lst="${FOLDERS[*]}"'
+echo "${fmPath}/${lst}" | sed -r 's#//#/#g' | tr -dc [:print:]
+}
+
+function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - full folder path )
+{
+imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
 # get number of messages in given imap folder
 local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
@@ -80,18 +93,19 @@ if ! [[ $cmdResult =~ $re ]] ; then
   declare -i imapResult=${cmdResult};
 fi
 # get number of messages on the filesystem for given folder
-if [[ ! -d "${fmPath}${imapFolder}" ]] ; then
-  echo "Folder ${imapFolder} not found on filesystem, error: ${cmdResult}";return 1;
+local fmPath="$(imapFolderFsPath "${1}" "${3}")";
+if [[ ! -d "${fmPath}" ]] ; then
+  echo "Folder ${fmPath} not found on filesystem, error: ${cmdResult}";return 1;
     else
-  local cmdResult="$(find "${fmPath}${imapFolder}/" -maxdepth 1 -type f -name "*.imap" | wc -l)"
+  local cmdResult="$(find "${fmPath}" -maxdepth 1 -type f -name "*.imap" | wc -l)"
   if ! [[ $cmdResult =~ $re ]] ; then
-    echo "${fmPath}${imapFolder}/";return 1;
+    echo "${fmPath}";return 1;
       else
     declare -i fsResult=${cmdResult};
   fi
 fi
 if [[ ${imapResult} -ne ${fsResult} ]] ; then
-    echo "${fmPath}${imapFolder}/";return 1;
+    echo "${fmPath}";return 1;
         else
     echo "${imapResult}";return 0;
 fi
@@ -203,18 +217,18 @@ local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webm
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
 }
 
-function prepFolderRestore # ( 1: user@email, 2: full path to folder )
+function prepFolderRestore # ( 1: user@email, 2: full imap mailbox fs path )
 {
 local dstPath="${2}";
 local fmPath="$(getFullMailboxPath ${1})";
 local iwmPath="$(echo ${dstPath} | sed -r "s|${mntPrefixPath}||")";
-local srcPath="${mntPrefixPath}${backupPrefixPath}/${iwmPath}";
-if [[ (-f "${dstPath}") && (-f "${srcPath}") ]]; then
+local srcPath="${mntPrefixPath}/${backupPrefixPath}/${iwmPath}";
+if [[ (-f "${dstPath}${indexFileName}") && (-f "${srcPath}${indexFileName}") ]]; then
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
-/usr/bin/cp -fv "${srcPath}/${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
+/usr/bin/cp -fv "${srcPath}${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
 echo "${dstPath}" >> "${tmpFile}"
   else
-  echo "Error copying files, either src: ${srcPath} or dst: ${dstPath} does not exist."
+  echo "Error copying files, either src: ${srcPath}${indexFileName} or dst: ${dstPath}${indexFileName} does not exist."
 fi
 }
 
@@ -225,10 +239,11 @@ local dstName="${1}${indexFileName}";
 local bckName="${1}${bckPrefix}${indexFileName}";
 echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
 /usr/bin/mv -v "${dstName}" "${bckName}" && /usr/bin/mv -v "${srcName}" "${dstName}";
+chown icewarp:icewarp "${dstName}"
 return ${?}
 }
 
-function indexFix # ()
+function indexFix # ( 1: user@email )
 {
 ${toolSh} set system C_System_Tools_WatchDog_POP3 0
 ${icewarpdSh} --stop pop3
@@ -241,7 +256,7 @@ do
 done
 ${icewarpdSh} --restart pop3
 ${toolSh} set system C_System_Tools_WatchDog_POP3 1
-${toolSh} set system C_Accounts_Global_Accounts_DirectoryCache_RefreshNow 1
+${toolSh} set account "${1}" u_directorycache_refreshnow 1
 }
 
 # main
@@ -250,7 +265,6 @@ yum -y install python python-six
 wget https://mail.icewarp.cz/imapcode.py
 chmod u+x imapcode.py
 fi
-rm -fv "${tmpFile}"
 cmdResult=$(imapFolderList "${1}" "${2}");
 if [[ ${?} -ne 0 ]] ; then
   echo "${cmdResult}";exit 1;
@@ -268,8 +282,8 @@ do
           continue;
   fi
 done
-if [[ -f "${tmpFile}" ]]; then
-  indexFix
+if [[ -s "${tmpFile}" ]]; then
+  indexFix "${1}"
 fi
 refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
 cmdResult="$(testWcFolder "${1}" "INBOX")";
@@ -278,7 +292,10 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-  echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Giving up."
+  echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Giving up ( deleting index, triggering cache refresh )."
+  /usr/bin/rm -fv "${cmdResult}${indexFileName}";
+  ${icewarpdSh} --restart pop3
+  ${toolSh} set account "${1}" u_directorycache_refreshnow 1
   continue
           else
           imapCnt=${cmdResult};
@@ -303,3 +320,8 @@ do
    fi
 done
 exit 0
+
+# TODO
+# 1/ log failed to file
+# 2/ trencin@denbraven.sk, folder: "INBOX/MACKA/TECHNICI SV.J."
+#    richtrova@denbraven.cz, folder: "INBOX/Jana O./GTQ Ho&AWEBZQDh-lkovy"
