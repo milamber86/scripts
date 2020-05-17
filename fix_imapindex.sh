@@ -23,7 +23,7 @@ backupPrefixPath=".zfs/snapshot/keep_20200512-0024";
 mntPrefixPath="/mnt/data";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
-wcCacheRetry=3;
+wcCacheRetry=100;
 excludePattern='^"~|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
@@ -61,14 +61,14 @@ for I in $( seq 0 $(( $total - 1 )) )
   do
   FOLDER="$(echo "${FOLDERS[$I]}" | tr -d '\n')";
   if [[ "${FOLDER}" =~ ^INBOX ]] ; then
-    FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|INBOX|inbox|')";
+    FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|^INBOX$|inbox|')";
       else
       if [[ ( "${FOLDER}" =~ \.$ ) || ( "${FOLDER}" =~ \.\. ) || ( "${FOLDER}" =~ \* ) ]] ; then
         local hexImapFolder="$(echo "${FOLDER}" | sed -r 's#\|# #g' | tr -d '\n' | xxd -ps -c 200)";
         FOLDERS[$I]="enc~${hexImapFolder}";
           else
           if [[ "${FOLDER}" =~ ^Spam ]] ; then
-            FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|Spam|~spam|')";
+            FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|^Spam$|~spam|')";
           fi
       fi
   fi
