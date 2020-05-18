@@ -12,7 +12,7 @@
 
 # global vars
 myDate="$(date +%m%d%y-%H%M)";
-ctimeout=30; # connection and idle timeout for netcat
+ctimeout=60; # connection and idle timeout for netcat
 iwserver="127.0.0.1";
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
@@ -119,14 +119,18 @@ function testWcFolder # ( 1: user@email, 2: imap folder name -> number of messag
 local tmpFolder="$(echo "${2}" | sed -r 's|"||g')";
 local folderEncName="$(echo "${tmpFolder}" | sed -r 's# #|#g')";
 local folderName="$(python imapcode.py "$(echo "${folderEncName}" | sed -r s'#\|# #g')")";
-local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27 and path like \x27%${tmpFolder}\x27;")";
 local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
 if ! [[ $dbResult =~ $re ]] ; then
   local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27 and path like \x27%${tmpFolder}%\x27;")";
   local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
   if ! [[ $dbResult =~ $re ]] ; then
-    echo "ERROR ${dbResult}"
-    return 1;
+    local dbQuery="$(echo -e "select folder_id from folder where account_id = \x27${1}\x27 and name = \x27${folderName}\x27;")";
+    local dbResult="$(echo "${dbQuery}" | mysql ${dbName} | egrep -v folder_id | tr -dc [:print:])";
+    if ! [[ $dbResult =~ $re ]] ; then
+      echo "ERROR ${dbResult}"
+      return 1;
+    fi
   fi
 fi
 local folderDbId=${dbResult}
@@ -301,7 +305,6 @@ done
 if [[ -s "${tmpFile}" ]]; then
   indexFix "${1}"
 fi
-rm -fv "${tmpFile}";
 refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
 cmdResult="$(testWcFolder "${1}" "INBOX")";
 if [[ $? -ne 0 ]] ; then resetWcUser "${1}"; fi
@@ -343,4 +346,16 @@ do
           fi
    fi
 done
+rm -fv "${tmpFile}";
 exit 0
+
+# todo
+# stribro@denbraven.cz, folder: "INBOX/OBI-Hornbach..._1", fullpath: INBOX/OBI-Hornbach..._1/
+# FAIL IMAP - User: jiri.mohyla@denbraven.cz, folder: "INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele",
+# fullpath: INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/. Trying to repair.
+# Error copying files, either src:
+# /mnt/data/.zfs/snapshot/keep_20200512-0024/INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/imapindex.bin
+# or dst:
+# INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/imapindex.bin does not exist.
+# FAIL IMAP 3rd time - User: konvicka@denbraven.cz, folder: "Odstran&ARs-n&AOE- po&AWE-ta/Arch&AO0-v/Marketing/_Vy&AVk-e&AWE-en&AOk-/S.n.sil. a n..sil", fullpath: Odstran&ARs-n&AOE- po&AWE-ta/Arch&AO0-v/Marketing/_Vy&AVk-e&AWE-en&AOk-/S.n.sil. a n..sil/. Logging,
+# giving up.
