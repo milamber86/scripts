@@ -63,6 +63,7 @@ for I in $( seq 0 $(( $total - 1 )) )
   if [[ ( "${FOLDER}" =~ INBOX ) && ( $I -eq 0 ) ]] ; then
     FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|INBOX|inbox|')";
       else
+      if [[ "${FOLDER}" =~ \.\.\._  ]] ; then continue ; fi;
       if [[ ( "${FOLDER}" =~ \.$ ) || ( "${FOLDER}" =~ \.\.\. ) || ( "${FOLDER}" =~ \* ) ]] ; then
         local hexImapFolder="$(echo "${FOLDER}" | sed -r 's#\|# #g' | tr -d '\n' | xxd -ps -c 200)";
         FOLDERS[$I]="enc~${hexImapFolder}";
@@ -314,12 +315,11 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
   echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
-  echo "/usr/bin/rm -fv "${cmdResult}/${indexFileName}""
-  /usr/bin/rm -fv "${cmdResult}/${indexFileName}";
-  /usr/bin/rm -fv "${cmdResult}/flags.dat";
-  /usr/bin/rm -fv "${cmdResult}/*.timestamp";
-  echo "*" > "${cmdResult}/flagsext.dat";
-  chown icewarp:icewarp "${cmdResult}/flagsext.dat";
+  /usr/bin/rm -fv "${cmdResult}${indexFileName}";
+  /usr/bin/rm -fv "${cmdResult}flags.dat";
+  /usr/bin/rm -fv "${cmdResult}*.timestamp";
+  echo "*" > "${cmdResult}flagsext.dat";
+  chown icewarp:icewarp "${cmdResult}flagsext.dat";
  # ${icewarpdSh} --restart pop3
   ${toolSh} set account "${1}" u_directorycache_refreshnow 1
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
