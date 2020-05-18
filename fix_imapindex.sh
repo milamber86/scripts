@@ -352,6 +352,6 @@ do
           fi
    fi
 done
-rm -fv "${tmpFile}";
+rm -f "${tmpFile}";
 echo "$(date) - ${1} end.";
 exit 0
