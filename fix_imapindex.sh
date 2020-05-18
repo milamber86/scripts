@@ -60,10 +60,10 @@ total=${#FOLDERS[*]};
 for I in $( seq 0 $(( $total - 1 )) )
   do
   FOLDER="$(echo "${FOLDERS[$I]}" | tr -d '\n')";
-  if [[ ( "${FOLDER}" =~ ^INBOX ) && ( $I -eq 0 ) ]] ; then
-    FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|^INBOX$|inbox|')";
+  if [[ ( "${FOLDER}" =~ INBOX ) && ( $I -eq 0 ) ]] ; then
+    FOLDERS[$I]="$(echo "${FOLDER}" | sed -r s'|INBOX|inbox|')";
       else
-      if [[ ( "${FOLDER}" =~ \.$ ) || ( "${FOLDER}" =~ \.\. ) || ( "${FOLDER}" =~ \* ) ]] ; then
+      if [[ ( "${FOLDER}" =~ \.$ ) || ( "${FOLDER}" =~ \.\.\. ) || ( "${FOLDER}" =~ \* ) ]] ; then
         local hexImapFolder="$(echo "${FOLDER}" | sed -r 's#\|# #g' | tr -d '\n' | xxd -ps -c 200)";
         FOLDERS[$I]="enc~${hexImapFolder}";
           else
@@ -85,16 +85,6 @@ echo "${fmPath}/${lst}" | sed -r 's#//#/#g' | sed -r 's#\|# #g'
 # test if imap reports the same number of messages in SELECT <mailbox> EXISTS response as the number of messages in folder on filesystem
 function testImapFolder # ( 1: login email, 2: password, 3: imap folder path -> OK: number of messages in folder, NOK - imap mailbox full encoded fs path )
 {
-imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
-# get number of messages in given imap folder in EXISTS SELECT response
-local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
-local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
-# test imap returned integer in number of messages in folder test, if not, plan index restore
-if ! [[ $cmdResult =~ $re ]] ; then
-    echo "${fmPath}${imapFolder}/";return 1;
-    else
-  declare -i imapResult=${cmdResult};
-fi
 # get number of messages on the filesystem for given folder
 local fmPath="$(imapFolderFsPath "${1}" "${3}")";
 if [[ ! -d "${fmPath}" ]] ; then
@@ -106,6 +96,16 @@ if [[ ! -d "${fmPath}" ]] ; then
       else
     declare -i fsResult=${cmdResult};
   fi
+fi
+# get number of messages in given imap folder in EXISTS SELECT response
+imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
+local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
+# test imap returned integer in number of messages in folder test, if not, plan index restore
+if ! [[ $cmdResult =~ $re ]] ; then
+    echo "${fmPath}";return 1;
+    else
+  declare -i imapResult=${cmdResult};
 fi
 if [[ ${imapResult} -ne ${fsResult} ]] ; then
     echo "${fmPath}";return 1;
@@ -242,13 +242,14 @@ function prepFolderRestore # ( 1: user@email, 2: full imap mailbox fs path ) pre
 local dstPath="${2}";
 local fmPath="$(getFullMailboxPath ${1})";
 local iwmPath="$(echo ${dstPath} | sed -r "s|${mntPrefixPath}||")";
-local srcPath="${mntPrefixPath}/${backupPrefixPath}/${iwmPath}";
+local srcPath="${mntPrefixPath}/${backupPrefixPath}${iwmPath}";
 if [[ (-f "${dstPath}${indexFileName}") && (-f "${srcPath}${indexFileName}") ]]; then
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
 /usr/bin/cp -fv "${srcPath}${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
 echo "${dstPath}" >> "${tmpFile}"
   else
   echo "Error copying files, either src: ${srcPath}${indexFileName} or dst: ${dstPath}${indexFileName} does not exist."
+  return 1
 fi
 }
 
@@ -297,7 +298,7 @@ do
   if [[ ${?} -ne 0 ]] ; then
     echo "FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
     prepFolderRestore "${1}" "${cmdResult}"
-          else
+      else
            ##   echo "   OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}."
           continue;
   fi
@@ -313,10 +314,13 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
   echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
-  /usr/bin/rm -fv "${cmdResult}${indexFileName}";
-  /usr/bin/rm -fv "${cmdResult}flags.dat";
-  /usr/bin/rm -fv "${cmdResult}*.timestamp";
-  ${icewarpdSh} --restart pop3
+  echo "/usr/bin/rm -fv "${cmdResult}/${indexFileName}""
+  /usr/bin/rm -fv "${cmdResult}/${indexFileName}";
+  /usr/bin/rm -fv "${cmdResult}/flags.dat";
+  /usr/bin/rm -fv "${cmdResult}/*.timestamp";
+  echo "*" > "${cmdResult}/flagsext.dat";
+  chown icewarp:icewarp "${cmdResult}/flagsext.dat";
+ # ${icewarpdSh} --restart pop3
   ${toolSh} set account "${1}" u_directorycache_refreshnow 1
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
@@ -348,14 +352,3 @@ do
 done
 rm -fv "${tmpFile}";
 exit 0
-
-# todo
-# stribro@denbraven.cz, folder: "INBOX/OBI-Hornbach..._1", fullpath: INBOX/OBI-Hornbach..._1/
-# FAIL IMAP - User: jiri.mohyla@denbraven.cz, folder: "INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele",
-# fullpath: INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/. Trying to repair.
-# Error copying files, either src:
-# /mnt/data/.zfs/snapshot/keep_20200512-0024/INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/imapindex.bin
-# or dst:
-# INBOX/P&AVg-EROV -stavebn&AO0- &AQ0A4Q-st 1/Vyj&AOE-d&AVk-en&AO0- &APoBWQ-adu k &APo-zemn&AO0-mu &AVkA7Q-zeni a stavebn&AO0-mu &AVkA7Q-zen&AO0-/ministerstvo zdravotnictv&AO0--l&AOE-zn&ARs- a h&AVkA7Q-dele/imapindex.bin does not exist.
-# FAIL IMAP 3rd time - User: konvicka@denbraven.cz, folder: "Odstran&ARs-n&AOE- po&AWE-ta/Arch&AO0-v/Marketing/_Vy&AVk-e&AWE-en&AOk-/S.n.sil. a n..sil", fullpath: Odstran&ARs-n&AOE- po&AWE-ta/Arch&AO0-v/Marketing/_Vy&AVk-e&AWE-en&AOk-/S.n.sil. a n..sil/. Logging,
-# giving up.
