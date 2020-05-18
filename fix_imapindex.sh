@@ -28,13 +28,14 @@ excludePattern='^"~|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AO
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 logFailed="/root/logFailed_fix";
+dbgLvl=1;
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
 {
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
-  echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult}";return 1;
+  echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult} Could not auth.";return 1;
     else
   echo "${cmdResult}" | egrep -v "Completed" | egrep -v "${excludePattern}";
   return 0;
@@ -287,6 +288,7 @@ yum -y install python python-six
 wget https://mail.icewarp.cz/imapcode.py
 chmod u+x imapcode.py
 fi
+echo "$(date) - ${1} start.";
 cmdResult=$(imapFolderList "${1}" "${2}");
 if [[ ${?} -ne 0 ]] ; then
   echo "${cmdResult}";exit 1;
@@ -297,11 +299,11 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-    echo "FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
+    echo "+++ FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
     prepFolderRestore "${1}" "${cmdResult}"
       else
-           ##   echo "   OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}."
-          continue;
+          if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}." ; fi ;
+          
   fi
 done
 if [[ -s "${tmpFile}" ]]; then
@@ -314,7 +316,7 @@ for i in "${imapFolders[@]}"
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-  echo "FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
+  echo "+++ FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
   /usr/bin/rm -fv "${cmdResult}${indexFileName}";
   /usr/bin/rm -fv "${cmdResult}flags.dat";
   /usr/bin/rm -fv "${cmdResult}*.timestamp";
@@ -325,7 +327,7 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
     if [[ ${?} -ne 0 ]] ; then
-    echo "FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
+    echo "+++ FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
     echo "${cmdResult}" >> "${logFailed}"
     fi
           else
@@ -333,22 +335,23 @@ do
           cmdResult="$(testWcFolder "${1}" "${i}")";
           if [[ $? -ne 0 ]] ; then resetWcFolder "${1}" "${i}"; fi
           if [[ ${cmdResult} -ne ${imapCnt} ]] ; then
-          echo "FAIL WC - User: ${1}, folder: ${i}, wc cache / imap have: ${cmdResult} / ${imapCnt} msgs.";
+          echo "+++ FAIL WebC - User: ${1}, folder: ${i}, wc cache / imap have: ${cmdResult} / ${imapCnt} msgs.";
           for j in $(seq 1 $wcCacheRetry);
             do
             fixWcFolder "${1}" "${i}";
             refreshWcFolder "${1}" "${2}" "${i}";
-            if [[ $? -ne 0 ]] ; then echo "FAIL WC 2nd time - User: ${1}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
+            if [[ $? -ne 0 ]] ; then echo "FAIL WebC 2nd time - User: ${1}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
             cmdResult=$(testWcFolder "${1}" "${i}");
-            echo "Status after repair cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+            echo "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
             if [[ $cmdResult -eq ${imapCnt} ]] ; then break ; fi
             sleep 15;
             done
                       else
-                       ##      echo "   OK WC - User: ${1}, ${cmdResult} msgs, folder: ${i}."
+                      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK WEBC - User: ${1}, imap: ${imapCnt}, web: ${cmdResult} msgs, folder: ${i}." ; fi
                       continue;
           fi
    fi
 done
 rm -fv "${tmpFile}";
+echo "$(date) - ${1} end.";
 exit 0
