@@ -328,7 +328,7 @@ do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
     if [[ ${?} -ne 0 ]] ; then
     echo "+++ FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
-    echo "${cmdResult}" >> "${logFailed}"
+    echo "${1};${cmdResult};" >> "${logFailed}"
     fi
           else
           imapCnt=${cmdResult};
