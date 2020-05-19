@@ -32,7 +32,7 @@ dbgLvl=1;
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
 {
-local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v ' \\Public \\iaclLookup' | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
   echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult} Could not auth.";return 1;
@@ -175,7 +175,7 @@ local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
 
 function resetWcUser # ( 1: user@email ) delete whole user wc cache db
 {
-local dbQuery="$(echo -e "delete from item where folder_id in (select folder_id from folder where account_id = \x27${1}\x27;")";
+local dbQuery="$(echo -e "delete from item where folder_id in (select folder_id from folder where account_id = \x27${1}\x27);")";
 local dbResult="$(echo "${dbQuery}" | mysql "${dbName}")";
 # todo test db result
 local dbQuery="$(echo -e "delete from folder where account_id = \x27${1}\x27;")";
@@ -282,6 +282,8 @@ ${toolSh} set system C_System_Tools_WatchDog_POP3 1
 ${toolSh} set account "${1}" u_directorycache_refreshnow 1
 }
 
+overwrite() { echo -e "\r\033[1A\033[0K$@"; }
+
 # main
 if [[ ! -f imapcode.py ]]; then
 yum -y install python python-six
@@ -302,11 +304,10 @@ do
     echo "+++ FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
     prepFolderRestore "${1}" "${cmdResult}"
       else
-          if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}." ; fi ;
-          
+      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}." ; fi ;
   fi
 done
-if [[ -s "${tmpFile}" ]]; then
+if [[ -s "${tmpFile}" ]] ; then
   indexFix "${1}"
 fi
 refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
@@ -322,7 +323,7 @@ do
   /usr/bin/rm -fv "${cmdResult}*.timestamp";
   echo "*" > "${cmdResult}flagsext.dat";
   chown icewarp:icewarp "${cmdResult}flagsext.dat";
- # ${icewarpdSh} --restart pop3
+  ${icewarpdSh} --restart pop3
   ${toolSh} set account "${1}" u_directorycache_refreshnow 1
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
@@ -342,7 +343,11 @@ do
             refreshWcFolder "${1}" "${2}" "${i}";
             if [[ $? -ne 0 ]] ; then echo "FAIL WebC 2nd time - User: ${1}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
             cmdResult=$(testWcFolder "${1}" "${i}");
-            echo "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+            if [[ $j -ge 2 ]] ; then
+              overwrite "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+                else
+                echo "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+            fi
             if [[ $cmdResult -eq ${imapCnt} ]] ; then break ; fi
             sleep 15;
             done
