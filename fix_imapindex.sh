@@ -29,6 +29,7 @@ re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 logFailed="/root/logFailed_fix";
 dbgLvl=1;
+resetInbox=1;
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
 {
@@ -113,6 +114,20 @@ if [[ ${imapResult} -ne ${fsResult} ]] ; then
     echo "${fmPath}";return 1;
         else
     echo "${imapResult}";return 0;
+fi
+}
+
+function getImapSeenCnt # ( 1: login email, 2: password, 3: imap folder path -> OK: number of seen messages in folder, NOK - imap mailbox full encoded fs path )
+{
+# get number of messages in given imap folder in UID SEARCH seen response
+imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
+local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. uid search seen\n. logout\n"
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep '\* SEARCH' | sed -r 's|\* SEARCH ||' | wc -w)"
+if ! [[ $cmdResult =~ $re ]] ; then
+    echo "${fmPath}";return 1;
+    else
+  declare -i seenCnt=${cmdResult};
+  echo "${seenCnt}";return 0;
 fi
 }
 
@@ -248,7 +263,7 @@ local srcPath="${mntPrefixPath}/${backupPrefixPath}${iwmPath}";
 if [[ (-f "${dstPath}${indexFileName}") && (-f "${srcPath}${indexFileName}") ]]; then
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
 /usr/bin/cp -fv "${srcPath}${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
-echo "${dstPath}" >> "${tmpFile}"
+#echo "${dstPath}" >> "${tmpFile}"
   else
   echo "Error copying files, either src: ${srcPath}${indexFileName} or dst: ${dstPath}${indexFileName} does not exist."
   return 1
@@ -263,7 +278,10 @@ local bckName="${1}${bckPrefix}${indexFileName}";
 echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
 /usr/bin/mv -v "${dstName}" "${bckName}" && /usr/bin/mv -v "${srcName}" "${dstName}";
 chown icewarp:icewarp "${dstName}"
-return ${?}
+cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${dstName}");
+echo "*" > "${1}flagsext.dat";
+chown icewarp:icewarp "${1}flagsext.dat";
+cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${1}flagsext.dat}");
 }
 
 function indexFix # ( 1: user@email ) stop imap, rename restored idx, backup original ones, restart imap
@@ -282,22 +300,37 @@ ${toolSh} set system C_System_Tools_WatchDog_POP3 1
 ${toolSh} set account "${1}" u_directorycache_refreshnow 1
 }
 
+function indexFolderFix # ( 1: user@email. 2: full fs folder path ) stop imap, rename restored idx, backup original ones, restart imap
+{
+${toolSh} set system C_System_Tools_WatchDog_POP3 0
+${icewarpdSh} --stop pop3
+sleep 1
+${icewarpdSh} --stop pop3
+pkill -9 -f pop3
+indexRename "${2}"
+${icewarpdSh} --restart pop3
+${toolSh} set system C_System_Tools_WatchDog_POP3 1
+${toolSh} set account "${1}" u_directorycache_refreshnow 1
+}
+
+
 overwrite() { echo -e "\r\033[1A\033[0K$@"; }
 
 # main
-if [[ ! -f imapcode.py ]]; then
+if [[ ( ! -f imapcode.py ) || ( ! -f cache_invalidate.php ) ]]; then
 yum -y install python python-six
-wget https://mail.icewarp.cz/imapcode.py
+wget https://raw.githubusercontent.com/milamber86/scripts/master/imapcode.py
+wget https://raw.githubusercontent.com/milamber86/scripts/master/cache_invalidate.php
 chmod u+x imapcode.py
 fi
 echo "$(date) - ${1} start.";
-cmdResult=$(imapFolderList "${1}" "${2}");
+cmdResult=$(imapFolderList "${1}" "${2}"); # get imap folder list
 if [[ ${?} -ne 0 ]] ; then
   echo "${cmdResult}";exit 1;
     else
   readarray -t imapFolders < <(echo "${cmdResult}")
 fi
-for i in "${imapFolders[@]}"
+for i in "${imapFolders[@]}" # loop through folders in folder list, test fs vs imap count
 do
   cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
@@ -308,7 +341,16 @@ do
   fi
 done
 if [[ -s "${tmpFile}" ]] ; then
-  indexFix "${1}"
+  indexFix "${1}";
+fi
+if [[ $resetInbox -eq 1 ]] ; then
+  fmPath="$(imapFolderFsPath "${1}" "INBOX")";
+  imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "INBOX");
+  echo "INBOX index reset. Pre seen count: ${imapSeenCnt}";
+  prepFolderRestore "${1}" "${fmPath}";
+  indexFolderFix "${1}" "${fmPath}";
+  imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "INBOX");
+  echo "INBOX index reset. Post seen count: ${imapSeenCnt}";
 fi
 refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
 cmdResult="$(testWcFolder "${1}" "INBOX")";
@@ -319,6 +361,7 @@ do
   if [[ ${?} -ne 0 ]] ; then
   echo "+++ FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
   /usr/bin/rm -fv "${cmdResult}${indexFileName}";
+  cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${cmdResult}${indexFileName}");
   /usr/bin/rm -fv "${cmdResult}flags.dat";
   /usr/bin/rm -fv "${cmdResult}*.timestamp";
   echo "*" > "${cmdResult}flagsext.dat";
@@ -333,10 +376,11 @@ do
     fi
           else
           imapCnt=${cmdResult};
+          imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "${i}");
           cmdResult="$(testWcFolder "${1}" "${i}")";
           if [[ $? -ne 0 ]] ; then resetWcFolder "${1}" "${i}"; fi
           if [[ ${cmdResult} -ne ${imapCnt} ]] ; then
-          echo "+++ FAIL WebC - User: ${1}, folder: ${i}, wc cache / imap have: ${cmdResult} / ${imapCnt} msgs.";
+          echo "+++ FAIL WebC - User: ${1}, folder: ${i}, wc cache / imap / imap seen: ${cmdResult} / ${imapCnt} / ${imapSeenCnt} msgs.";
           for j in $(seq 1 $wcCacheRetry);
             do
             fixWcFolder "${1}" "${i}";
@@ -352,7 +396,7 @@ do
             sleep 15;
             done
                       else
-                      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK WEBC - User: ${1}, imap: ${imapCnt}, web: ${cmdResult} msgs, folder: ${i}." ; fi
+                      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK WEBC - User: ${1}, imap: ${imapCnt}, imap seen: ${imapSeenCnt}, web: ${cmdResult} msgs, folder: ${i}." ; fi
                       continue;
           fi
    fi
