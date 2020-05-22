@@ -8,7 +8,7 @@ $gwapi = new IceWarpGWAPI();
 $filename = $argv[1]?$argv[1]:'groupware.xml';
 
 $gwapi->user = $api->GetProperty('C_GW_SuperUser');
-$gwapi->pass = $api->GetProperty('C_GW_SuperPass');
+$gwapi->setPassword( $api->GetProperty('C_GW_SuperPass') );
 $gwapi->Login();
 
 echo $gwapi->FunctionCall("ImportData",$gwapi->sessid,file_get_contents($filename));
