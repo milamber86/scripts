@@ -9,7 +9,7 @@ $list = $argv[1]?$argv[1]:'*';
 $filename = $argv[2]?$argv[2]:'groupware.xml';
 
 $gwapi->user = $api->GetProperty('C_GW_SuperUser');
-$gwapi->pass = $api->GetProperty('C_GW_SuperPass');
+$gwapi->setPassword( $api->GetProperty('C_GW_SuperPass') );
 $gwapi->Login();
 
 $data = $gwapi->FunctionCall("ExportData",$gwapi->sessid,$list);
