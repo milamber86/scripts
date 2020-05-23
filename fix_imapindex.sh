@@ -19,21 +19,22 @@ icewarpdSh="/opt/icewarp/icewarpd.sh";
 tmpFile="$(mktemp /tmp/folderrepair.XXXXXXXXX)";
 iwArchivePattern='^"Archive';
 indexFileName="imapindex.bin";
-backupPrefixPath=".zfs/snapshot/keep_20200512-0024";
+backupPrefixPath=".zfs/snapshot/20200522-0024";
 mntPrefixPath="/mnt/data";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
 wcCacheRetry=100;
 excludePattern='^"~|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
+pubFolderPattern=' \\Public| \\Virtual| \\Shared| \\Noselect';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 logFailed="/root/logFailed_fix";
 dbgLvl=1;
-resetInbox=1;
+resetInbox=0;
 
 function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
 {
-local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v ' \\Public \\iaclLookup' | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v "${pubFolderPattern}" | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
   echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult} Could not auth.";return 1;
@@ -319,6 +320,8 @@ overwrite() { echo -e "\r\033[1A\033[0K$@"; }
 # main
 if [[ ( ! -f imapcode.py ) || ( ! -f cache_invalidate.php ) ]]; then
 yum -y install python python-six
+rm -fv imapcode.py
+rm -fv cache_invalidate.php
 wget https://raw.githubusercontent.com/milamber86/scripts/master/imapcode.py
 wget https://raw.githubusercontent.com/milamber86/scripts/master/cache_invalidate.php
 chmod u+x imapcode.py
