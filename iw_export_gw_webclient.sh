@@ -65,7 +65,7 @@ wcSid=${1};
 email="${2}";
 folderName="${3}";
 targetPath="${4}";
-# export Calendar folder to ics format
+# export Calendar, Tasks folder to ics format
 calexport_request="<iq sid=\"wm-${wcSid}\" type=\"set\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${email}\"><folder uid=\"${folderName}\" action=\"save_items\"/></account></query></iq>"
 calexport_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${calexport_request}" "https://${iwserver}/webmail/server/webmail.php")";
 echo "${calexport_response}";
@@ -108,6 +108,10 @@ parseFolders
 mkdir -p "${exportPath}/${1}";
 while IFS=';' read name type; do
   folderName="$(echo "${name}" | tr -d '"')";
+  if [[ ${folderName} =~ '/' ]]; then
+    makeDir="$(echo ${folderName} | awk -F'/' '{OFS = "/"; $NF=""; print $0}')";
+    mkdir -p "${exportPath}/${1}/${makeDir}";
+  fi
   case ${type} in
    '"E"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics" ;;
    '"C"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.vcf" ;;
