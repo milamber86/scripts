@@ -1,6 +1,5 @@
 #!/bin/bash
 iwserver="127.0.0.1";                             # IceWarp server IP/host
-declare -i guest=0;                               # test account type, 0 - standard user account, 1 - teamchat guest account
 ctimeout="50";                                    # curl connection timeout in seconds
 tmpFile="/root/tmpFile";
 tmpFolders="/root/tmpFolders";
