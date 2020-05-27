@@ -1,11 +1,11 @@
 #!/bin/bash
-iwserver="127.0.0.1";                             # IceWarp server IP/host
-ctimeout="50";                                    # curl connection timeout in seconds
+iwserver="mail.icewarp.cz";                       # IceWarp server IP/host
+ctimeout="600";                                   # curl connection timeout in seconds
 tmpFile="/root/tmpFile";
 tmpFolders="/root/tmpFolders";
 exportPath="/root/exporttst";
 mkdir -p "${exportPath}"
-
+excludePattern='^"TeamChat';
 function rawurlencode # urlencode string function
 {
   local string="${1}"
@@ -50,13 +50,10 @@ wcSid=${1};
 email="${2}";
 folderName="${3}";
 targetPath="${4}";
-start=`date +%s%N | cut -b1-13`
 # export Contacts folder to vcf format
 encemail="$(rawurlencode "${email}")"
 curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL "https://${iwserver}/webmail/server/download.php?sid=wm-${wcSid}&class=exportvcard&fullpath=${encemail}%2F${folderName}" > "${targetPath}"
-end=`date +%s%N | cut -b1-13`
-runtime=$((end-start))
-echo "${runtime};${targetPath}";
+# echo "${targetPath}";
 }
 
 function exportFolderICS # ( 1: wcSid, 2: user@email, 3: folderName, 4: targetPath )
@@ -68,11 +65,9 @@ targetPath="${4}";
 # export Calendar, Tasks folder to ics format
 calexport_request="<iq sid=\"wm-${wcSid}\" type=\"set\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${email}\"><folder uid=\"${folderName}\" action=\"save_items\"/></account></query></iq>"
 calexport_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${calexport_request}" "https://${iwserver}/webmail/server/webmail.php")";
-echo "${calexport_response}";
 local fullPath="$(echo "${calexport_response}" | egrep -o "<fullpath>(.*)</fullpath>" | perl -pe 's|<fullpath>(.*)</fullpath>|\1|')";
-echo "${fullPath}";
 curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/server/download.php?class=file&fullpath=${fullPath}&sid=wm-${wcSid}" > "${targetPath}"
-echo "${runtime};${targetPath}";
+# echo "${targetPath}";
 }
 
 function getFolders # ( 1: wcSid, 2: user@email -> gw folders list to tmpFile )
@@ -81,23 +76,28 @@ wcSid="${1}";
 email="${2}";
 getfolder_request="<iq sid=\"wm-${wcSid}\" uid=\"${email}\" type=\"set\" format=\"json\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>";
 getfolder_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${getfolder_request}" "https://${iwserver}/webmail/server/webmail.php")";
-echo "${getfolder_response}" | json_reformat -u | jq -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]' | tr -d '[]{}' | sed -r 's|"VALUE":||' > "${tmpFile}"
+echo "${getfolder_response}" | json_reformat -u | jq -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]|\"ATTRIBUTES\":\{\"UID\":\"[[:alnum:]\/\@_]*\"\}\}' | tr -d '[]{}' | sed -r 's|"VALUE":||' | sed -r 's|"UID":||' > "${tmpFile}"
 }
 
 function parseFolders # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
 {
 local wantType=0;
 while IFS=':' read attr value; do
-        if [[ ${attr} =~ '"RELATIVE_PATH"' ]]; then
-          local folderName="${value}";
-          local wantType=1;
-          else if [[ ( ${attr} =~ '"TYPE"' ) && ( wantType -eq 1 ) ]]; then
-            if [[ ( ${value} =~ '"E"' ) || ( ${value} =~ '"C"' ) || ( ${value} =~ '"T"' ) ]]; then
-              echo "${folderName};${value};"
-              local wantType=0;
-            fi
-          fi
-        fi
+    if [[ ${attr} =~ '"RELATIVE_PATH"' ]]; then
+      local folderName="${value}";
+      local wantType=1;
+    fi
+    if [[ ( ${attr} =~ '"TYPE"' ) && ( wantType -eq 1 ) ]]; then
+      if [[ ( ${value} =~ '"E"' ) || ( ${value} =~ '"C"' ) || ( ${value} =~ '"T"' ) ]]; then
+        folderRecord="${folderName};${value};";
+      else
+        local wantType=0;
+      fi
+    fi
+    if [[ ( ${attr} =~ '"ATTRIBUTES"' ) && ( wantType -eq 1 ) && ( ${value} == ${folderName} ) ]]; then
+            echo "${folderRecord}";
+            local wantType=0;
+    fi
 done < "${tmpFile}" > "${tmpFolders}"
 }
 
