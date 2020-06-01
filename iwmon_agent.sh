@@ -46,7 +46,9 @@ logfile="${scriptdir}/iwmon_${logdate}.log"
 email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="Some-Pass-12345";                                      # password
 outputpath="/opt/icewarp/var";                               # results output path
-nfstestfile="/mnt/data-nfs/check.txt"                        # path to nfs mount test file ( must exist )
+nfstestfile="/mnt/data/storage.dat"                          # path to nfs mount test file ( must exist )
+toolSh="/opt/icewarp/tool.sh";
+icewarpdSh="/opt/icewarp/icewarpd.sh";
 /usr/bin/touch "${scriptdir}/iwmon.cfg"
 /usr/bin/chmod 600 "${scriptdir}/iwmon.cfg"
 
@@ -82,26 +84,26 @@ local FILE="/opt/icewarp/path.dat"
 if [ -f "${FILE}" ]
   then
   local mail_outpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _outgoing | dos2unix)
-  [ -z "${mail_outpath}" ] && local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
+  [ -z "${mail_outpath}" ] && local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|')
   local mail_inpath=$(cat /opt/icewarp/path.dat | grep -v retry | grep _incoming | dos2unix)
-  [ -z "${mail_inpath}" ] && local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
+  [ -z "${mail_inpath}" ] && local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|')
   else
-  local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|');
-  local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} /opt/icewarp/tool.sh get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|');
+  local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|');
+  local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|');
 fi
 writecfg "mail_outpath" "${mail_outpath}";
 writecfg "mail_inpath" "${mail_inpath}";
-local super="$(timeout -k 30 30 /opt/icewarp/tool.sh get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
+local super="$(timeout -k 30 30 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 writecfg "super" "${super}";
-declare DBUSER=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
-declare DBPASS=$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
-read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 /opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
+declare DBUSER=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
+declare DBPASS=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
+read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
 read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
-declare PASS=$(timeout -k 3 3 /opt/icewarp/tool.sh export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
-timeout -k 3 3 /opt/icewarp/tool.sh set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
+timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
+timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
+declare PASS=$(timeout -k 3 3 ${toolSh} export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
+timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
+timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 1 > /dev/null 2>&1
 writecfg "EASUser" "${USER}"
 writecfg "EASPass" "${PASS}"
 writecfg "EASVers" "${aVER}"
@@ -158,12 +160,12 @@ if [ ! -f ${scriptdir}/activesync.txt ]
   cd "${scriptdir}"
   wget https://mail.icewarp.cz/webdav/ticket/eJwNy0EOhCAMAMDf9KZbKw1w6NUP.IICZWNMNFE06.,duc9XWF0cCpY4qkGVeb,SfjyQZYJT2CeqgRHNEA7paHDeMfrgwASWfyZS5opa.KO5Lbedz5b79muwCuUQNOKY0gsMHR5N/activesync.txt
 fi
-utiltest="$(/opt/icewarp/tool.sh get system C_System_Adv_Ext_SNMPServer | awk '{print $2}')"
+utiltest="$(${toolSh} get system C_System_Adv_Ext_SNMPServer | awk '{print $2}')"
 if [[ ${utiltest} != "1" ]]
   then
   log "Enabling IceWarp SNMP and restarting control service"
-  /opt/icewarp/tool.sh set system C_System_Adv_Ext_SNMPServer 1
-  /opt/icewarp/icewarpd.sh --restart control
+  ${toolSh} set system C_System_Adv_Ext_SNMPServer 1
+  ${icewarpdSh} --restart control
 fi
 }
 
@@ -189,7 +191,7 @@ fi
 function cfgstat()
 {
 local super="$(readcfg "super")";
-local result="$(timeout -k 10 10 /opt/icewarp/tool.sh get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
+local result="$(timeout -k 10 10 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 if [[ "${super}" == "${result}" ]]
   then
   echo "OK" > ${outputpath}/cfgstatus.mon;
@@ -486,11 +488,11 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
     then
      local guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
      local guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
-     timeout -k 10 10 /opt/icewarp/tool.sh export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
+     timeout -k 10 10 ${toolSh} export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
      local result=$?
      if [[ ${result} != 0 ]]
          then
-         timeout -k 10 10 /opt/icewarp/tool.sh create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
+         timeout -k 10 10 ${toolSh} create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
          local result=$?
          if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Error creating test account";return 1;fi
      fi
@@ -564,7 +566,7 @@ if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
 function printStats() {
-echo "IceWarp stats for ${HOSTNAME}"
+echo "IceWarp stats for ${HOSTNAME} at $(date)"
 echo "last value update - service: check result"
 echo "--- Status ( OK | FAIL ):"
 for SIMPLECHECK in smtp imap xmpp grw http nfsmnt cfg
