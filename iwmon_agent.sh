@@ -512,6 +512,15 @@ if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcsta
 if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
     then
      # refresh folders standard account start
+     # get settings
+     get_settings_request="<iq sid=\"wm-"${wcsid}"\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:private\"><resources><skins/><banner_options/><im/><sip/><chat/><mail_settings_default/><mail_settings_general/><login_settings/><layout_settings/><homepage_settings/><calendar_settings/><default_calendar_settings/><cookie_settings/><default_reminder_settings/><event_settings/><spellchecker_languages/><signature/><groups/><restrictions/><aliases/><read_confirmation/><global_settings/><paths/><streamhost/><password_policy/><fonts/><certificate/><timezones/><external_settings/><gw_mygroup/><default_folders/><documents/></resources></query></iq>";
+     get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
+     if [[ "${get_settings_response}" =~ "result" ]];
+         then
+          local freturn=OK
+         else
+          local freturn=FAIL;return 1;
+     fi
      local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
      if [[ "${response}" =~ "INBOX" ]];
@@ -520,7 +529,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
          else
           local freturn=FAIL
      fi # refresh folders standard account end
-    else
+     else
      # refresh folders teamchat guest account start
      local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${guestaccemail}\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${guestaccemail}\"/></query></iq>"
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
