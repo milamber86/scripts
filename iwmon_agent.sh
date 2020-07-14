@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20200714_002
+# ver. 20200714_003
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -689,7 +689,7 @@ all) if [[ "${2}" == "verbose" ]]
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfscheck;cfgcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
