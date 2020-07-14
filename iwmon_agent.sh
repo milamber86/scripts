@@ -1,6 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
+# ver. 20200714_002
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -11,7 +12,7 @@
 # UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
 # UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppstatus.mon
 # UserParameter=icewarp.grw,/opt/icewarp/scripts/iwmon.sh "grw";cat /opt/icewarp/var/grwstatus.mon
-# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin" "1";cat /opt/icewarp/var/wcstatus.mon
+# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin" "0";cat /opt/icewarp/var/wcstatus.mon
 # UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
 # UserParameter=icewarp.easresult,/opt/icewarp/scripts/iwmon.sh "easlogin";cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
@@ -43,8 +44,9 @@ EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
-email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="Some-Pass-12345";                                      # password
+email="test@mgmt.loc";                                       # email address, standard user must exist, guest user will be created by this script if it does not exist
+pass="TestPass1234";                                         # password
+wcguest=0;                                                   # 0 - use standard account for webclient check, 1 - use autocreated guest account for webclient check and check using login to teamchat ( must be enabled )
 outputpath="/opt/icewarp/var";                               # results output path
 nfstestfile="/mnt/data/storage.dat"                          # path to nfs mount test file ( must exist )
 toolSh="/opt/icewarp/tool.sh";
@@ -519,7 +521,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
          then
           local freturn=OK
          else
-          local freturn=FAIL;return 1;
+          local freturn=FAIL;log "Stage 4 fail - Error getting settings, possible API problem";return 1;
      fi
      local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
@@ -527,7 +529,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
          then
           local freturn=OK
          else
-          local freturn=FAIL
+          local freturn=FAIL;log "Stage 5 fail - No INBOX in folder sync response";
      fi # refresh folders standard account end
      else
      # refresh folders teamchat guest account start
@@ -626,27 +628,27 @@ function printUsage() {
 Synopsis
     iwmon.sh setup
     checks and installs dependencies, sets initial runtime configuration
- 
+
     iwmon.sh check_name [ check_parameter ]
     supported health-checks: cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
-    
+
     iwmon.sh connstat [ service_name ]
     supported services: smtp, imap, xmpp, grw, http
-    
+
     iwmon.sh queuestat [ smtp_queue_name ]
     available queues: inc ( incoming ), outg ( outgoing ), retr ( outgoing-retry )
-    
+
     iwmon.sh connstat [ smtp_msg_stat_name ]
     available smtp stats: msgout, msgin, msgfail, msgfaildata, msgfailvirus, msgfailcf, msgfailextcf, msgfailrule
     ( for more details, see https://esupport.icewarp.com/index.php?/Knowledgebase/Article/View/180/16/snmp-in-icewarp )
-    
+
     iwmon.sh all silent/verbose
     get all stats in one run and optionally print the stats to STDOUT
-    
+
     ---
     Performs healthchecks and queries service connection number stats and smtp
     queue lengths for IceWarp server.
-    
+
 EOF
 }
 
@@ -680,14 +682,14 @@ queuestat) queuestat "${2}";
 ;;
 all) if [[ "${2}" == "verbose" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfsmntstat;cfgstat;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "1";eascheck;nfscheck;cfgcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfscheck;cfgcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
