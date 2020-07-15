@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20200714_003
+# ver. 20200715_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -497,6 +497,8 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
          timeout -k 10 10 ${toolSh} create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
          local result=$?
          if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Error creating test account";return 1;fi
+     else
+     local email="${guestaccemail}";
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
