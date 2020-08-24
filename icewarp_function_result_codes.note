@@ -1,0 +1,13 @@
+// Function Result Codes
+  S_OK = $00;
+
+  E_FAILURE = -$01; // Function failure
+  E_LICENSE = -$02; // Insufficient license
+  E_PARAMS = -$03; // Size of parameters too short
+  E_PATH = -$04; // Settings file does not exist
+  E_CONFIG = -$05; // Configuration not found
+  E_PASSWORD = -$06; // Password policy
+  E_CONFLICT = -$07; // Item already exists
+  E_INVALID = -$08; // Invalid mailbox / alias characters
+  E_PASSWORDCHARS = -$09; // Invalid password characters
+  E_MIGRATION_IN_PROGRESS = -$0A; // User migration in progress   
