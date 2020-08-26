@@ -10,10 +10,12 @@ accDbConn="$(/opt/icewarp/tool.sh get system c_system_storage_accounts_odbcconns
 dcDbConn="$(/opt/icewarp/tool.sh get system c_accounts_global_accounts_directorycacheconnectionstring | awk '{print $2}')"
 gwDbConn="$(/opt/icewarp/tool.sh get system c_gw_connectionstring | awk '{print $2}')"
 asDbConn="$(/opt/icewarp/tool.sh get system c_as_challenge_connectionstring | awk '{print $2}')"
-for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDbConn dcDbConn gwDbConn asDbConn;
+easDbConn="$(/opt/icewarp/tool.sh get system C_ActiveSync_DBConnection | awk '{print $2}')"
+easDbUser="$(/opt/icewarp/tool.sh get system C_ActiveSync_DBUser | awk '{print $2}')"
+easDbPass="$(/opt/icewarp/tool.sh get system C_ActiveSync_DBPass | awk '{print $2}')"
+for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDbConn dcDbConn gwDbConn asDbConn easDbConn easDbUser easDbPass;
   do
     eval ref=\$${I};
     echo -e "${I} ${ref}" >> ${cfgExportFile};
     echo -e "${I} ${ref}";
   done
-  
