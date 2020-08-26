@@ -1,5 +1,5 @@
 cfgImportFile=/root/cfgexport.cf
-for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDbConn dcDbConn gwDbConn asDbConn;
+for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDbConn dcDbConn gwDbConn asDbConn easDbConn easDbUser easDbPass;
   do
     val="$(egrep "${I}" "${cfgImportFile}" | awk '{print $2}')";
     case "${I}" in
@@ -23,6 +23,12 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDb
       ;;
       asDbConn) /opt/icewarp/tool.sh set system c_as_challenge_connectionstring "${val}"
       ;;
+      easDbConn) /opt/icewarp/tool.sh set system C_ActiveSync_DBConnection "${val}"
+      ;;
+      easDbUser) /opt/icewarp/tool.sh set system C_ActiveSync_DBUser "${val}"
+      ;;
+      easDbPass) /opt/icewarp/tool.sh set system C_ActiveSync_DBPass "${val}"
+      ;;
+
     esac
   done
-  
