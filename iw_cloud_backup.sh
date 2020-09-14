@@ -7,12 +7,13 @@ mkdir -p ${maildirpath}
 mkdir -p ${backuppath}
 mkdir -p ${scriptdir}/logs
 backupsrvhost="${1}" # if we take backups from another host
-backupsrvport="${2}" # than the one we connect to
+backupsrvport="${2}" # than the one in IW connection strings
 cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<licensetype>).*(?=</licensetype>)' -o -m 1)
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
 retention_days=3;
 retention_log_days=30;
+dbport=4008;
 
 function log()
 {
@@ -47,15 +48,12 @@ if [[ $sizeM -le 2048 ]];
   else
    log "Backup destination OK";
 fi
-# check src database
-dbcheck=$(/usr/bin/mysql -u ${accdbuser} -p${dbpass} -h ${dbhost} -P ${dbport} -e 'SHOW DATABASES;' | grep -cw "${accdbname}\|${grwdbname}\|${aspdbname}\|${dcdbname}\|${easdbname}\|${wcdbname}");
-echo "dbcheck";
-# check cloud plan
-if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
-then
-  log "Aborting - not Cloud licence."
-  exit 1
-fi
+## check cloud plan
+#if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
+#then
+#  log "Aborting - not Cloud licence."
+#  exit 1
+#fi
 # util test
 utiltest="$(/bin/find /usr/lib64 -type f -name "Entities.pm")"
 if [[ -z "${utiltest}" ]]
@@ -66,22 +64,54 @@ if [[ -z "${utiltest}" ]]
 fi
 }
 
-log "Starting backup."
-log "Reading DB access data."
+function discover_dbnames() # ( 1: dbtype -> dbname )
+{
+case ${1} in
+acc) local accdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_system_storage_accounts_odbcconnstring | perl -pe 's|^c_system_storage_accounts_odbcconnstring: (.*);(.*);.*;.*;.*;.*$|\1|')";
+echo "${accdbname}"
+;;
+asp) local aspdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_as_challenge_connectionstring | egrep -v '^mysql:' | perl -pe 's|^c_as_challenge_connectionstring: (.*);.*;.*;.*;.*;.*$|\1|')";
+echo "${aspdbname}"
+;;
+grw) local grwdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_gw_connectionstring | perl -pe 's|^c_gw_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1|')";
+echo "${grwdbname}"
+;;
+dc) local dcdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_accounts_global_accounts_directorycacheconnectionstring | perl -pe 's|^c_accounts_global_accounts_directorycacheconnectionstring: (.*);(.*);.*;.*;.*;.*$|\1|')";
+echo "${dcdbname}"
+;;
+eas) local easdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | ${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | egrep -o "mysql:host=.*;dbname=.*" | perl -pe 's|^mysql:host=.*;port=.*;dbname=(.*)$|\1|')";
+echo "${easdbname}"
+;;
+wc) local wcdbname="$(cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\3|')";
+echo "${wcdbname}"
+esac
+}
 
-dbpass="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
-wcdbuser="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
-read -r dbhost dbport wcdbname <<< $(cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1 \2 \3|');
-read -r accdbname accdbuser <<< $(${IWS_INSTALL_DIR}/tool.sh get system c_system_storage_accounts_odbcconnstring | perl -pe 's|^c_system_storage_accounts_odbcconnstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|');
-read -r aspdbname aspdbuser <<< $(${IWS_INSTALL_DIR}/tool.sh get system c_as_challenge_connectionstring | perl -pe 's|^c_as_challenge_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|');
-read -r grwdbname grwdbuser <<< $(${IWS_INSTALL_DIR}/tool.sh get system c_gw_connectionstring | perl -pe 's|^c_gw_connectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|');
-read -r dcdbname dcdbuser <<< $(${IWS_INSTALL_DIR}/tool.sh get system c_accounts_global_accounts_directorycacheconnectionstring | perl -pe 's|^c_accounts_global_accounts_directorycacheconnectionstring: (.*);(.*);.*;.*;.*;.*$|\1 \2|');
-easdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | ${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | egrep -o "mysql:host=.*;dbname=.*" | perl -pe 's|^mysql:host=.*;port=.*;dbname=(.*)$|\1|')";
-easdbuser="$(${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbuser | perl -pe 's|^c_activesync_dbuser: (.*)$|\1|')";
-easdbpass="$(${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbpass | perl -pe 's|^c_activesync_dbpass: (.*)$|\1|')";
-if [ -z "${easdbpass}" ]; then easdbpass="easdbpass not discovered"; fi
-if [[ "${dbpass}" =~ "^sqlite:.*" ]]; then dbpass="${easdbpass}"; fi
-if [ -z "${dbpass}" ]; then dbpass="dbpass not discovered"; fi
+function discover_creds() # ( -> username password )
+{
+local dbuser="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
+local dbpass="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
+echo "${dbuser} ${dbpass}"
+}
+
+function discover_dbhost() # ( -> db connection IP/hostname )
+{
+local dbhost="$(cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
+echo "${dbhost}"
+}
+
+log "Starting backup."
+preflight_check;
+log "Reading DB access data."
+read -r dbuser dbpass <<< "$(discover_creds)";
+dbhost="$(discover_dbhost)";
+accdbname="$(discover_dbnames "acc")";
+aspdbname="$(discover_dbnames "asp")";
+grwdbname="$(discover_dbnames "grw")";
+dcdbname="$(discover_dbnames "dc")";
+easdbname="$(discover_dbnames "eas")";
+wcdbname="$(discover_dbnames "wc")";
+
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 
@@ -99,14 +129,13 @@ accbckfile="${backuppath}/bck_acc_backup`date +%Y%m%d-%H%M`.csv";
 dombckfile="${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv";
 
 log "Starting DB backup."
-/usr/bin/mysqldump --single-transaction -u ${accdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${aspdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${grwdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${easdbuser} -p${easdbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${wcdbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile} &
 log "Finished DB backup."
-wait ${!}
 log "Starting IW config backup."
 /bin/tar -czf ${cnfbckfile} ${IWS_INSTALL_DIR}/config > /dev/null 2>&1
 /bin/tar -czf ${calbckfile} ${IWS_INSTALL_DIR}/calendar > /dev/null 2>&1
@@ -114,11 +143,14 @@ log "Starting IW config backup."
 ${IWS_INSTALL_DIR}/tool.sh export account "*@*" u_backup > ${accbckfile}
 ${IWS_INSTALL_DIR}/tool.sh export domain "*" d_backup > ${dombckfile}
 log "Finished IW config backup."
+wait ${!}
 log "Checking all backupfiles are created."
+sleep 10;
 for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbckfile cnfbckfile calbckfile logbckfile accbckfile dombckfile;
   do
-   sizeK=$(du -k ${I} | awk '{print $1}');
-   if [[ $sizeK -le 1024 ]]
+   eval ref=\$${I};
+   sizeK=$(du -k ${ref} | awk '{print $1}');
+   if [[ $sizeK -lt 1 ]]
      then
       log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; exit 1;
      else
