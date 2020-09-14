@@ -164,11 +164,15 @@ for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbck
      else
       log "Backup file ${I} size ${sizeK}KB, OK"
    fi
-   if [[ ($sizeK -le 1) && (("${I}" == "accbckfile") || ("${I}" == "dombckfile")) ]]
+   if [[ ("${I}" == "accbckfile") || ("${I}" == "dombckfile") ]]
      then
-      log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
-     else
-      log "Backup file ${I} size ${sizeK}KB, OK"
+      linenum=$(/usr/bin/wc -l ${ref})
+      if [[ ${linenum} -le 1 ]]
+        then
+         log "Backup file ${I} lenght less or equal 1 ( ${linenum} lines ), fail."; die_error;
+        else
+         log "Backup file ${I} lenght ${linenum} lines, OK"
+      fi   
    fi
   done
 log "Cleaning old backups and logs."
