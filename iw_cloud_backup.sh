@@ -20,18 +20,24 @@ function log()
   echo $(date +%H:%M:%S) $1 >> ${logfile}
 }
 
+function die_error() # ( die with error, log failure to /opt/icewarp/var/iwbackup.mon )
+{
+echo "FAIL" > /opt/icewarp/var/iwbackup.mon
+exit 1
+}
+
 function preflight_check() # ( check src/dst paths,src database connection, cloudplan, util test )
 {
 # check src storage
-fstabtest=$(/bin/cat /etc/fstab | grep -o "${maildirpath}")
-mounttest=$(/bin/mount | grep -o "${maildirpath}")
+fstabtest=$(/usr/bin/cat /etc/fstab | grep -o "${maildirpath}")
+mounttest=$(/usr/bin/mount | grep -o "${maildirpath}")
 if [[ "$maildirpath" == "$fstabtest" ]]
 then
   log "Storage is a mountpoint - checking."
   if [[ "$maildirpath" != "$mounttest" ]]
     then
     log "Storage not mounted. Aborting."
-    exit 1
+    die_error;
   else
     log "Storage mountcheck ok."
   fi
@@ -44,18 +50,18 @@ sizeM=$(( $sizeK / 1024 ));
 if [[ $sizeM -le 2048 ]];
   then
    log "Insufficient space on the backup target path: ${sizeM} MB left on ${backuppath}";
-   exit 1
+   die_error;
   else
    log "Backup destination OK";
 fi
-## check cloud plan
-#if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
-#then
-#  log "Aborting - not Cloud licence."
-#  exit 1
-#fi
+# check cloud plan
+if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
+then
+  log "Aborting - not Cloud licence."
+  die_error;
+fi
 # util test
-utiltest="$(/bin/find /usr/lib64 -type f -name "Entities.pm")"
+utiltest="$(/usr/bin/find /usr/lib64 -type f -name "Entities.pm")"
 if [[ -z "${utiltest}" ]]
   then
   log "Installing Entities.pm"
@@ -89,16 +95,19 @@ esac
 
 function discover_creds() # ( -> username password )
 {
-local dbuser="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
-local dbpass="$(/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
+local dbuser="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
+local dbpass="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
 echo "${dbuser} ${dbpass}"
 }
 
 function discover_dbhost() # ( -> db connection IP/hostname )
 {
-local dbhost="$(cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
+local dbhost="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
 echo "${dbhost}"
 }
+# MAIN
+
+trap 'echo "FAIL" > /opt/icewarp/var/iwbackup.mon' SIGINT SIGTERM
 
 log "Starting backup."
 preflight_check;
@@ -111,7 +120,7 @@ grwdbname="$(discover_dbnames "grw")";
 dcdbname="$(discover_dbnames "dc")";
 easdbname="$(discover_dbnames "eas")";
 wcdbname="$(discover_dbnames "wc")";
-
+ 
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 
@@ -129,36 +138,40 @@ accbckfile="${backuppath}/bck_acc_backup`date +%Y%m%d-%H%M`.csv";
 dombckfile="${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv";
 
 log "Starting DB backup."
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile} &
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile} &
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile}
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile}
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile}
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile}
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile}
+/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile}
 log "Finished DB backup."
 log "Starting IW config backup."
-/bin/tar -czf ${cnfbckfile} ${IWS_INSTALL_DIR}/config > /dev/null 2>&1
-/bin/tar -czf ${calbckfile} ${IWS_INSTALL_DIR}/calendar > /dev/null 2>&1
-/bin/find ${IWS_INSTALL_DIR}/logs -type f -mtime -1 -print0 | /bin/tar -czvf ${logbckfile} --null -T - > /dev/null 2>&1
+/usr/bin/tar -czf ${cnfbckfile} ${IWS_INSTALL_DIR}/config > /dev/null 2>&1
+/usr/bin/tar -czf ${calbckfile} ${IWS_INSTALL_DIR}/calendar > /dev/null 2>&1
+/usr/bin/find ${IWS_INSTALL_DIR}/logs -type f -mtime -1 -print0 | /usr/bin/tar -czvf ${logbckfile} --null -T - > /dev/null 2>&1
 ${IWS_INSTALL_DIR}/tool.sh export account "*@*" u_backup > ${accbckfile}
 ${IWS_INSTALL_DIR}/tool.sh export domain "*" d_backup > ${dombckfile}
 log "Finished IW config backup."
-wait ${!}
 log "Checking all backupfiles are created."
-sleep 10;
 for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbckfile cnfbckfile calbckfile logbckfile accbckfile dombckfile;
   do
    eval ref=\$${I};
    sizeK=$(du -k ${ref} | awk '{print $1}');
-   if [[ $sizeK -lt 1 ]]
+   if [[ ($sizeK -le 8) && (("${I}" != "accbckfile") || ("${I}" != "dombckfile")) ]]
      then
-      log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; exit 1;
+      log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
+     else
+      log "Backup file ${I} size ${sizeK}KB, OK"
+   fi
+   if [[ ($sizeK -le 1) && (("${I}" == "accbckfile") || ("${I}" == "dombckfile")) ]]
+     then
+      log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
      else
       log "Backup file ${I} size ${sizeK}KB, OK"
    fi
   done
 log "Cleaning old backups and logs."
-/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +${retention_days} -delete > /dev/null 2>&1
-/bin/find ${scriptdir}/logs/ -type f -name "bck_*.log" -mtime +${retention_log_days} -delete > /dev/null 2>&1
+/usr/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +${retention_days} -delete > /dev/null 2>&1
+/usr/bin/find ${scriptdir}/logs/ -type f -name "bck_*.log" -mtime +${retention_log_days} -delete > /dev/null 2>&1
 log "All done."
 exit 0
