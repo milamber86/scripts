@@ -156,6 +156,7 @@ log "Checking all backupfiles are created."
 for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbckfile cnfbckfile calbckfile logbckfile accbckfile dombckfile;
   do
    eval ref=\$${I};
+   /usr/bin/touch "${ref}"
    sizeK=$(du -k ${ref} | awk '{print $1}');
    if [[ ($sizeK -le 8) && (("${I}" != "accbckfile") || ("${I}" != "dombckfile")) ]]
      then
