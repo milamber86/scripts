@@ -1,10 +1,11 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20200825_001
+# ver. 20200915_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
+# UserParameter=icewarp.iwbackup,/opt/icewarp/scripts/iwmon.sh "iwver";cat /opt/icewarp/var/iwbackupstatus.mon
 # UserParameter=icewarp.iwver,/opt/icewarp/scripts/iwmon.sh "iwver";cat /opt/icewarp/var/iwverstatus.mon
 # UserParameter=icewarp.cfg,/opt/icewarp/scripts/iwmon.sh "cfg";cat /opt/icewarp/var/cfgstatus.mon
 # UserParameter=icewarp.nfs,/opt/icewarp/scripts/iwmon.sh "nfs";cat /opt/icewarp/var/nfsmntstatus.mon
@@ -216,6 +217,12 @@ if ! [[ $result =~ $re ]]
   else
     echo "$result" > ${outputpath}/iwverstatus.mon; return 0;
 fi
+}
+
+# get icewarp backup status
+function iwbackupcheck()
+{
+local void=1
 }
 
 # check groupware database is available
@@ -596,7 +603,7 @@ function printStats() {
 echo "IceWarp stats for ${HOSTNAME} at $(date)"
 echo "last value update - service: check result"
 echo "--- Status ( OK | FAIL ):"
-for SIMPLECHECK in smtp imap xmpp grw http nfsmnt cfg iwver
+for SIMPLECHECK in smtp imap xmpp grw http nfsmnt cfg iwver iwbackup
     do
     echo -n "$(stat -c'%y' "${outputpath}/${SIMPLECHECK}status.mon") - "
     echo -n "${SIMPLECHECK}: "
@@ -646,7 +653,7 @@ Synopsis
     checks and installs dependencies, sets initial runtime configuration
 
     iwmon.sh check_name [ check_parameter ]
-    supported health-checks: iwver, cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
+    supported health-checks: iwbackup, iwver, cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
 
     iwmon.sh connstat [ service_name ]
     supported services: smtp, imap, xmpp, grw, http
@@ -674,6 +681,8 @@ case ${1} in
 setup) installdeps;
        init;
 ;;
+iwbackup) iwbackupcheck;
+;;
 iwver) iwvercheck;
 ;;
 cfg) cfgstat;
@@ -700,14 +709,14 @@ queuestat) queuestat "${2}";
 ;;
 all) if [[ "${2}" == "verbose" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
