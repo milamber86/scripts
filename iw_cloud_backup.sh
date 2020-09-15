@@ -24,7 +24,7 @@ function log()
 
 function die_error() # ( die with error, log failure to /opt/icewarp/var/iwbackup.mon )
 {
-echo "FAIL" > /opt/icewarp/var/iwbackup.mon
+echo "FAIL" > /opt/icewarp/var/iwbackupstatus.mon
 exit 1
 }
 
@@ -111,7 +111,7 @@ echo "${dbhost}"
 }
 # MAIN
 
-trap 'echo "FAIL" > /opt/icewarp/var/iwbackup.mon' SIGINT SIGTERM
+trap 'echo "FAIL" > /opt/icewarp/var/iwbackupstatus.mon' SIGINT SIGTERM
 
 log "Starting backup."
 preflight_check;
