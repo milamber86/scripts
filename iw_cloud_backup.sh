@@ -1,4 +1,5 @@
 #!/bin/bash
+# ver. 20200915_01
 source /etc/icewarp/icewarp.conf
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
@@ -6,6 +7,7 @@ scriptdir="$(cd $(dirname $0) && pwd)"
 mkdir -p ${maildirpath}
 mkdir -p ${backuppath}
 mkdir -p ${scriptdir}/logs
+dbport=4008;
 backupsrvhost="${1}" # if we take backups from another host
 backupsrvport="${2}" # than the one in IW connection strings
 cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<licensetype>).*(?=</licensetype>)' -o -m 1)
@@ -13,7 +15,7 @@ logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
 retention_days=3;
 retention_log_days=30;
-dbport=4008;
+
 
 function log()
 {
@@ -54,12 +56,14 @@ if [[ $sizeM -le 2048 ]];
   else
    log "Backup destination OK";
 fi
+
 # check cloud plan
-if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
-then
-  log "Aborting - not Cloud licence."
-  die_error;
-fi
+#if [ -z "$cloudplan" ] || [ "$cloudplan" != "cloud" ]
+#then
+#  log "Aborting - not Cloud licence."
+#  die_error;
+#fi
+
 # util test
 utiltest="$(/usr/bin/find /usr/lib64 -type f -name "Entities.pm")"
 if [[ -z "${utiltest}" ]]
@@ -120,7 +124,7 @@ grwdbname="$(discover_dbnames "grw")";
 dcdbname="$(discover_dbnames "dc")";
 easdbname="$(discover_dbnames "eas")";
 wcdbname="$(discover_dbnames "wc")";
- 
+
 if [ ! -z "${backupsrvhost}" ]; then dbhost="${backupsrvhost}"; fi # if we take backups from another host
 if [ ! -z "${backupsrvport}" ]; then dbport="${backupsrvport}"; fi # than the one we connect to
 
@@ -155,25 +159,25 @@ log "Finished IW config backup."
 log "Checking all backupfiles are created."
 for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbckfile cnfbckfile calbckfile logbckfile accbckfile dombckfile;
   do
-   eval ref=\$${I};
-   /usr/bin/touch "${ref}"
-   sizeK=$(du -k ${ref} | awk '{print $1}');
-   if [[ ($sizeK -le 8) && (("${I}" != "accbckfile") || ("${I}" != "dombckfile")) ]]
-     then
-      log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
-     else
-      log "Backup file ${I} size ${sizeK}KB, OK"
-   fi
-   if [[ ("${I}" == "accbckfile") || ("${I}" == "dombckfile") ]]
-     then
-      linenum=$(/usr/bin/wc -l ${ref})
-      if [[ ${linenum} -le 1 ]]
-        then
-         log "Backup file ${I} lenght less or equal 1 ( ${linenum} lines ), fail."; die_error;
-        else
-         log "Backup file ${I} lenght ${linenum} lines, OK"
-      fi   
-   fi
+    eval ref=\$${I};
+    if [ "${I}" = "accbckfile" ] || [ "${I}" = "dombckfile" ];
+      then
+        lines=$(wc -l ${ref} | awk '{print $1}')
+        if [[ ${lines} -lt 2 ]]
+          then
+            log "Backup file ${I} shorter than 2 lines ( ${lines} lines ), fail."; die_error;
+          else
+            log "Backup file ${I} lenght ${lines} lines, OK"
+        fi
+      else
+        sizeK=$(du -k ${ref} | awk '{print $1}');
+        if [[ ${sizeK} -le 8 ]]
+          then
+            log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
+          else
+            log "Backup file ${I} size ${sizeK}KB, OK"
+        fi
+    fi
   done
 log "Cleaning old backups and logs."
 /usr/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +${retention_days} -delete > /dev/null 2>&1
