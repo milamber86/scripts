@@ -19,3 +19,5 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDb
     echo -e "${I} ${ref}" >> ${cfgExportFile};
     echo -e "${I} ${ref}";
   done
+cat /opt/icewarp/config/_webmail/server.xml | tee ${cfgExportFile}.web
+exit 0
