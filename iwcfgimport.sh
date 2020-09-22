@@ -31,4 +31,6 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDb
       ;;
 
     esac
+mv -v "/opt/icewarp/config/_webmail/server.xml" "/opt/icewarp/config/_webmail/server.xml_bak_iwcfgimport_$(date '+%s')"
+cp -fv "${cfgImportFile}.web" /opt/icewarp/config/_webmail/server.xml
   done
