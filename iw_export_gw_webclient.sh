@@ -1,5 +1,5 @@
 #!/bin/bash
-iwserver="mail.icewarp.cz";                       # IceWarp server IP/host
+iwserver="127.0.0.1";                             # IceWarp server IP/host
 ctimeout="600";                                   # curl connection timeout in seconds
 tmpFile="/root/tmpFile";
 tmpFolders="/root/tmpFolders";
@@ -83,22 +83,17 @@ function parseFolders # ( tmpFile folder list from getFolders -> folder_name;typ
 {
 local wantType=0;
 while IFS=':' read attr value; do
-    if [[ ${attr} =~ '"RELATIVE_PATH"' ]]; then
+    if [[ ${attr} =~ '"TYPE"' ]]
+      then
+      folderType=${value}
+    fi
+    if [[ ( ${attr} =~ '"RELATIVE_PATH"' ) && ( ( ${folderType} =~ '"E"' ) || ( ${folderType} =~ '"C"' ) || ( ${folderType} =~ '"T"' ) ) ]]
+      then
       local folderName="${value}";
-      local wantType=1;
+      folderRecord="${folderName};${folderType};";
+      echo "${folderRecord}" >> ${tmpFolders}
     fi
-    if [[ ( ${attr} =~ '"TYPE"' ) && ( wantType -eq 1 ) ]]; then
-      if [[ ( ${value} =~ '"E"' ) || ( ${value} =~ '"C"' ) || ( ${value} =~ '"T"' ) ]]; then
-        folderRecord="${folderName};${value};";
-      else
-        local wantType=0;
-      fi
-    fi
-    if [[ ( ${attr} =~ '"ATTRIBUTES"' ) && ( wantType -eq 1 ) && ( ${value} == ${folderName} ) ]]; then
-            echo "${folderRecord}";
-            local wantType=0;
-    fi
-done < "${tmpFile}" > "${tmpFolders}"
+done < "${tmpFile}"
 }
 
 # main
