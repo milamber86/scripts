@@ -4,6 +4,7 @@ ctimeout="600";                                   # curl connection timeout in s
 tmpFile="/root/tmpFile";
 tmpFolders="/root/tmpFolders";
 exportPath="/root/exporttst";
+importLogFile="/root/importLog";
 mkdir -p "${exportPath}"
 excludePattern='^"TeamChat';
 function rawurlencode # urlencode string function
@@ -115,10 +116,14 @@ while IFS=';' read name type; do
     mkdir -p "${exportPath}/${1}/${makeDir}";
   fi
   case ${type} in
-   '"E"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics" ;;
-   '"C"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.vcf" ;;
-   '"T"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics" ;;
+   '"E"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics"; folderPath="${exportPath}/${1}/${folderName}.ics";
+   ;;
+   '"C"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.vcf"; folderPath="${exportPath}/${1}/${folderName}.vcf";
+   ;;
+   '"T"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics"; folderPath="${exportPath}/${1}/${folderName}.ics";
+   ;;
   esac
+  echo "${1};;${2};;${type};;${folderName};;${folderPath};;" >> "${importLogFile}"
   echo "--- Finished exporting user ${1}, folder ${folderName} ---"
 done < "${tmpFolders}"
 sessionLogout "${wcSid}"
