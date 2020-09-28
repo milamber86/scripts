@@ -25,12 +25,12 @@ function sessionLogin # ( 1: user@email, 2: password -> wcSid - webclient sessio
 email="${1}";
 pass="${2}";
 atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
-wcatoken="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${atoken_request}" "http://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+wcatoken="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
 # get phpsessid
-wcphpsessid="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "http://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+wcphpsessid="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 # auth wc session
 auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
-wcSid="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${auth_request}" "http://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+wcSid="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
 echo "${wcSid}";
 }
 
@@ -38,7 +38,7 @@ function sessionLogout # ( 1: wcSid )
 {
 wcSid="${1}";
 logout_request="<iq sid=\"wm-"${wcSid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
-logout="$(curl --connect-timeout 30 -m 30 -kL --data-binary "${logout_request}" "http://${iwserver}/webmail/server/webmail.php")";
+logout="$(curl --connect-timeout 30 -m 30 -kL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php")";
 }
 
 function createGWFolder # ( 1: wcSid, 2: email, 3: folderTypeCode, 4: folderName -> 0: created OK, 1: already exists, 2: error )
@@ -48,7 +48,7 @@ email="${2}";
 folderTypeCode="${3}";
 folderName="${4}";
 folder_create_request="<iq sid=\"wm-"${wcSid}"\" uid=\""${email}"\" type=\"set\"><query xmlns=\"webmail:iq:folders\"><account uid=\""${email}"\"><folder action=\"add\"><type>${folderTypeCode}</type><name>"${folderName}"</name></folder></account></query></iq>"
-folder_create="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${folder_create_request}" "http://${iwserver}/webmail/server/webmail.php")"
+folder_create="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${folder_create_request}" "https://${iwserver}/webmail/server/webmail.php")"
 if [[ "${folder_create}" =~ "folder_already_exists" ]]
   then
   echo 1;return 1;
@@ -74,16 +74,17 @@ case ${fileType} in
   calendar) importAction="vcalendar" ;;
 esac
 tmpuuid="$(cat /proc/sys/kernel/random/uuid | tr -d '-')";
-postUid="$(echo "${tmpuuid::-10}")";
+postUid="$(echo "${tmpuuid:0:22}")";
 dateDay="$(date --rfc-3339='date')";
-data_upload_temp="$(curl -k -F "folder=${dateDay}-${postUid}" -F "sid=wm-${wcSid}" -F "swf=1" -F "folder=${dateDay}-${postUid}" -F "file=@${fileName};type=text/${fileType}" "http://${iwserver}/webmail/server/upload.php")";
-fileId="$(echo "${data_upload_temp}" | sed -r 's|.*,id:"(.*)",size.*|\1|')";
+data_upload_temp="$(curl -k -F "folder=${dateDay}-${postUid}" -F "sid=wm-${wcSid}" -F "swf=1" -F "folder=${dateDay}-${postUid}" -F "file=@${fileName};type=text/${fileType}" "https://${iwserver}/webmail/server/upload.php")";
+fileId="$(echo "${data_upload_temp}" | sed -r 's|.*,"id":"(.*)","size".*|\1|')";
 data_upload_request="<iq sid=\"wm-"${wcSid}"\" type=\"set\"><query xmlns=\"webmail:iq:import\"><import action=\"${importAction}\"><account uid=\""${email}"\"><folder uid=\""${folderName}"\"/></account><fullpath>${dateDay}-${postUid}/${fileId}</fullpath></import></query></iq>";
-data_upload="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${data_upload_request}" "http://${iwserver}/webmail/server/webmail.php")";
+data_upload="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${data_upload_request}" "https://${iwserver}/webmail/server/webmail.php")";
 echo "${data_upload}";
 }
 
 # main ( 1: email, 2: password, 3: folderTypeCode C|E|T, 4: folderName, 5: fileName )
+echo "--- Import START, *** user: ${1} *** , *** folder: ${4} ***, *** path: ${5} *** ---"
 sid="$(sessionLogin "${1}" "${2}")";
 createGWFolder "${sid}" "${1}" "${3}" "${4}";
 case ${3} in
@@ -93,4 +94,5 @@ case ${3} in
 esac
 importData "${sid}" "${1}" "${5}" "${type}" "${4}"
 echo "$(sessionLogout "${sid}")";
+echo "--- Import END, *** user: ${1} *** , *** folder: ${4} ***, *** path: ${5} *** ---"
 exit 0
