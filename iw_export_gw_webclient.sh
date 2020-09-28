@@ -81,16 +81,15 @@ echo "${getfolder_response}" | json_reformat -u | jq . -c | egrep -o '\"TYPE\":\
 
 function parseFolders # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
 {
-local wantType=0;
 while IFS=':' read attr value; do
     if [[ ${attr} =~ '"TYPE"' ]]
       then
-      folderType=${value}
+      local folderType=${value}
     fi
     if [[ ( ${attr} =~ '"RELATIVE_PATH"' ) && ( ( ${folderType} =~ '"E"' ) || ( ${folderType} =~ '"C"' ) || ( ${folderType} =~ '"T"' ) ) ]]
       then
       local folderName="${value}";
-      folderRecord="${folderName};${folderType};";
+      local folderRecord="${folderName};${folderType};";
       echo "${folderRecord}" >> ${tmpFolders}
     fi
 done < "${tmpFile}"
