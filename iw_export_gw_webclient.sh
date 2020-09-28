@@ -76,7 +76,7 @@ wcSid="${1}";
 email="${2}";
 getfolder_request="<iq sid=\"wm-${wcSid}\" uid=\"${email}\" type=\"set\" format=\"json\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>";
 getfolder_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${getfolder_request}" "https://${iwserver}/webmail/server/webmail.php")";
-echo "${getfolder_response}" | json_reformat -u | jq -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]|\"ATTRIBUTES\":\{\"UID\":\"[[:alnum:]\/\@_]*\"\}\}' | tr -d '[]{}' | sed -r 's|"VALUE":||' | sed -r 's|"UID":||' > "${tmpFile}"
+echo "${getfolder_response}" | json_reformat -u | jq . -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]|\"ATTRIBUTES\":\{\"UID\":\"[[:alnum:]\/\@_]*\"\}\}' | tr -d '[]{}' | sed -r 's|"VALUE":||' | sed -r 's|"UID":||' > "${tmpFile}"
 }
 
 function parseFolders # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
