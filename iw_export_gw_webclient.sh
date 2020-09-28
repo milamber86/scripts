@@ -81,27 +81,35 @@ echo "${getfolder_response}" | json_reformat -u | jq . -c | egrep -o '\"TYPE\":\
 
 function parseFolders # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
 {
+local wantType=0;
 while IFS=':' read attr value; do
     if [[ ${attr} =~ '"TYPE"' ]]
       then
-      local folderType=${value}
+      folderType=${value}
     fi
     if [[ ( ${attr} =~ '"RELATIVE_PATH"' ) && ( ( ${folderType} =~ '"E"' ) || ( ${folderType} =~ '"C"' ) || ( ${folderType} =~ '"T"' ) ) ]]
       then
       local folderName="${value}";
-      local folderRecord="${folderName};${folderType};";
+      folderRecord="${folderName};${folderType};";
       echo "${folderRecord}" >> ${tmpFolders}
     fi
 done < "${tmpFile}"
 }
 
 # main
+rm -f ${tmpFile}
+rm -f ${tmpFolders}
+echo "--- Logging user ${1} ---"
 wcSid="$(sessionLogin "${1}" "${2}")";
+echo "--- Exporting folders for ${1} ---"
 getFolders "${wcSid}" "${1}";
 parseFolders
+echo "--- Exported folders for ${1}: ---"
+cat ${tmpFolders}
 mkdir -p "${exportPath}/${1}";
 while IFS=';' read name type; do
   folderName="$(echo "${name}" | tr -d '"')";
+  echo "--- Exporting user ${1}, folder ${folderName} ---"
   if [[ ${folderName} =~ '/' ]]; then
     makeDir="$(echo ${folderName} | awk -F'/' '{OFS = "/"; $NF=""; print $0}')";
     mkdir -p "${exportPath}/${1}/${makeDir}";
@@ -111,6 +119,7 @@ while IFS=';' read name type; do
    '"C"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.vcf" ;;
    '"T"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics" ;;
   esac
+  echo "--- Finished exporting user ${1}, folder ${folderName} ---"
 done < "${tmpFolders}"
 sessionLogout "${wcSid}"
 exit 0
