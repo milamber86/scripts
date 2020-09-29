@@ -1,0 +1,22 @@
+1] remove all duplicates:
+CREATE TABLE EventGroup2 as SELECT DISTINCT * FROM EventGroup;
+CREATE TABLE EventOwner2 as SELECT DISTINCT * FROM EventOwner;
+
+2] delete the original tables and renew new ones:
+RENAME TABLE EventGroup to EventGroupBak; RENAME TABLE EventOwner to EventOwnerBak;
+RENAME TABLE EventGroup2 to EventGroup; RENAME TABLE EventOwner2 to EventOwner;
+
+3] delete empty Groups and Owners
+DELETE FROM EventGroup WHERE (GrpLink is null or GrpLink = '') AND GRP_ID NOT IN (SELECT DISTINCT(EVNGRP_ID) FROM (SELECT EVNGRP_ID FROM Event UNION SELECT ITMGRP_ID AS EVNGRP_ID FROM ContactItem) as temptable);
+DELETE FROM EventOwner WHERE OWN_ID NOT IN (SELECT GRPOWN_ID FROM EventGroup);
+
+4] get Owners that have data spread accross multiple groups
+SELECT OWN_Email, EventGroup.GRPOWN_ID, EventGroup.GRP_ID, count(GRP_ID) as Events FROM EventOwner, EventGroup LEFT OUTER JOIN Event ON GRP_ID = EVNGRP_ID WHERE OWN_ID = GRPOWN_ID AND (GrpLink is null or GrpLink = '') AND OWN_EMAIL IN
+(SELECT OWN_EMAIL FROM EventGroup, EventOwner WHERE OWN_ID = GRPOWN_ID AND (GrpLink is null or GrpLink = '') AND OWN_Email <> 'calendarservices' GROUP BY OWN_Email HAVING count(*) > 1)
+GROUP BY GRP_ID ORDER BY OWN_EMAIL;
+
+5] for each Email with duplicate data choose one OWN_ID and GRP_ID that will "preserve" and for all other GRP_IDs from previous query run, for example
+Update Event set EVNGRP_ID = '4b28a9910c61', EVNOWN_ID = '4b28a9910c5c' WHERE EVNGRP_ID = '4b5096454046';
+Update ContactItem set ITMGRP_ID = '4b28a9910c61', ITMOWN_ID = '4b28a9910c5c' WHERE ITMGRP_ID = '4b5096454046';
+
+6] rerun the queries from 3] to delete new empty groups
