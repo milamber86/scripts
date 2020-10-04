@@ -183,4 +183,5 @@ log "Cleaning old backups and logs."
 /usr/bin/find ${backuppath}/ -type f -name "bck_*" -mtime +${retention_days} -delete > /dev/null 2>&1
 /usr/bin/find ${scriptdir}/logs/ -type f -name "bck_*.log" -mtime +${retention_log_days} -delete > /dev/null 2>&1
 log "All done."
+echo "OK" > /opt/icewarp/var/iwbackupstatus.mon
 exit 0
