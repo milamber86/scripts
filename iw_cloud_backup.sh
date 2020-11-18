@@ -1,5 +1,5 @@
 #!/bin/bash
-# ver. 20201118_01
+# ver. 20201118_02
 source /etc/icewarp/icewarp.conf
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
@@ -7,7 +7,7 @@ scriptdir="$(cd $(dirname $0) && pwd)"
 mkdir -p ${maildirpath}
 mkdir -p ${backuppath}
 mkdir -p ${scriptdir}/logs
-dbport=4008;
+#dbport=4008;
 backupsrvhost="${1}" # if we take backups from another host
 backupsrvport="${2}" # than the one in IW connection strings
 cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<licensetype>).*(?=</licensetype>)' -o -m 1)
@@ -109,6 +109,14 @@ function discover_dbhost() # ( -> db connection IP/hostname )
 local dbhost="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
 echo "${dbhost}"
 }
+
+function discover_dbport() # ( -> db connection port )
+{
+local dbport="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\2|')";
+echo "${dbport}"
+}
+
+
 # MAIN
 
 trap 'echo "FAIL" > /opt/icewarp/var/iwbackupstatus.mon' SIGINT SIGTERM
@@ -118,6 +126,7 @@ preflight_check;
 log "Reading DB access data."
 read -r dbuser dbpass <<< "$(discover_creds)";
 dbhost="$(discover_dbhost)";
+dbport="$(discover_dbport)";
 accdbname="$(discover_dbnames "acc")";
 aspdbname="$(discover_dbnames "asp")";
 grwdbname="$(discover_dbnames "grw")";
