@@ -1,5 +1,5 @@
 #!/bin/bash
-# ver. 20200915_01
+# ver. 20201118_01
 source /etc/icewarp/icewarp.conf
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
@@ -32,7 +32,7 @@ function preflight_check() # ( check src/dst paths,src database connection, clou
 {
 # check src storage
 fstabtest=$(/usr/bin/cat /etc/fstab | grep -o "${maildirpath}")
-mounttest=$(/usr/bin/mount | grep -o "${maildirpath}")
+mounttest=$(/usr/bin/mount | grep -o "${maildirpath}" | tail -1)
 if [[ "$maildirpath" == "$fstabtest" ]]
 then
   log "Storage is a mountpoint - checking."
