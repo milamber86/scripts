@@ -15,7 +15,7 @@ msgfile="${2}"; # IceWarp message filename
 logfile="/opt/icewarp/scripts/smstest.log";
 #execemail="pwdres@somedomain.ex";
 #
-#/opt/icewarp/tool.sh set account "${email}" u_alternateemail "${execemail}"
+#/opt/icewarp/tool.sh set account "${email}" u_alternateemail "${execemail}" >> "${logfile}" 2>&1
 msgbody="$(cat "${msgfile}" | sed -e '1,/Content-Transfer-Encoding: base64/d' | egrep -v '^--' | tr -d '\t\n\r')";
 msgtext="$(echo "${msgbody}" | base64 -d | tail -3 | head -2)";
 query="SELECT ContactItem.*, ContactLocation.* FROM EventGroup, EventOwner, ContactItem left outer join ContactLocation on itm_id = lctitm_id WHERE Own_Email = \x27${email}\x27 AND ItmFolder = \x27@@mycard@@\x27 AND OWN_ID = GRPOWN_ID AND ITMGRP_ID = GRP_ID limit 1\G";
