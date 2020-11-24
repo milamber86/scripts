@@ -28,7 +28,7 @@ if [[ ( $? -eq 0 ) && ( ! -z "${result}" ) ]]
 fi
 if [[ ! -z "${msgbody}" ]]
   then
-    /usr/bin/curl -s -G -ikL 127.0.0.1/smstest.php --data-urlencode "from=${email}" --data-urlencode "to=${phone}" --data-urlencode "text=${msgbody}" >> "${logfile}" 2>&1
+    /usr/bin/curl -s -G -ikL 127.0.0.1/smsgw.php --data-urlencode "from=${email}" --data-urlencode "to=${phone}" --data-urlencode "text=${msgbody}" >> "${logfile}" 2>&1
     echo "[$(date)] - OK: Sent ${msgtext} to ${phone} for user ${email}." >> "${logfile}"
   else
     echo "[$(date)] - ERR: SMS message text empty ( user:${email} )." >> "${logfile}"
