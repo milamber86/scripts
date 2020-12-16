@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20200915_001
+# ver. 20201216_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -46,8 +46,10 @@ EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
-email="wczabbixmon@icewarp.loc";                             # email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="r4g53eR-4g54se6";                                      # password
+admemail="admuser"                                           # full IceWarp server admin credentials for impersonated checks
+admpass="admpass";                                           # password ^
+email="test_user";                                           # email address, standard user must exist, guest user will be created by this script if it does not exist
+pass="guestpass";                                            # password for guest account ( only for webclient login quest account check )
 wcguest=0;                                                   # 0 - use standard account for webclient check, 1 - use autocreated guest account for webclient check and check using login to teamchat ( must be enabled )
 outputpath="/opt/icewarp/var";                               # results output path
 nfstestfile="/mnt/data/storage.dat"                          # path to nfs mount test file ( must exist )
@@ -523,17 +525,21 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
-# get auth token
-local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
-local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
+# get admin auth token
+local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
+local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
 if [ -z "${wcatoken}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 1 fail - Error getting webclient auth token from control";return 1;fi
-# get phpsessid
-local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
-if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error getting php session ID";return 1;fi
-# auth wc session
+# impersonate webclient user
+local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
+local wclogin="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
+if [ -z "${wclogin}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error impersonating webclient user";return 1;fi
+# get user phpsessid
+local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "${wclogin}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error getting php session ID";return 1;fi
+# auth user webclient session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
 local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
-if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error logging to the webclient";return 1;fi
+if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 4 fail - Error logging to the webclient";return 1;fi
 if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
     then
      # refresh folders standard account start
@@ -544,7 +550,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
          then
           local freturn=OK
          else
-          local freturn=FAIL;log "Stage 4 fail - Error getting settings, possible API problem";return 1;
+          local freturn=FAIL;log "Stage 5 fail - Error getting settings, possible API problem";return 1;
      fi
      local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
@@ -552,7 +558,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
          then
           local freturn=OK
          else
-          local freturn=FAIL;log "Stage 5 fail - No INBOX in folder sync response";
+          local freturn=FAIL;log "Stage 6 fail - No INBOX in folder sync response";
      fi # refresh folders standard account end
      else
      # refresh folders teamchat guest account start
