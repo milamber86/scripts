@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20201216_001
+# ver. 20201217_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -59,6 +59,15 @@ icewarpdSh="/opt/icewarp/icewarpd.sh";
 /usr/bin/chmod 600 "${scriptdir}/iwmon.cfg"
 
 #FUNC
+# write log to local syslog
+function slog
+{
+local logsvr="${1}";
+local logmsg="${2}";
+local logdate="$(date '+%b %d %H:%M:%S')";
+/usr/bin/logger "${logdate} ${HOSTNAME} IWMON: ${logsvr} ${logmsg}"
+}
+
 # write setting to configfile
 function writecfg() # ( setting_name, setting_value )
 {
@@ -177,7 +186,7 @@ fi
 
 function log()
 {
-echo $(date +%H:%M:%S) $1 >> ${logfile}
+echo $(date '+%b %d %H:%M:%S') $1 >> ${logfile}
 }
 
 # nfs mount available check
@@ -185,10 +194,10 @@ function nfsmntstat()
 {
 if [ -f "${nfstestfile}" ]
   then
-  echo "OK" > ${outputpath}/nfsmntstatus.mon;
+  echo "OK" > ${outputpath}/nfsmntstatus.mon;slog "INFO" "NFS mount OK.";
   return 0
   else
-  echo "FAIL" > ${outputpath}/nfsmntstatus.mon;
+  echo "FAIL" > ${outputpath}/nfsmntstatus.mon;slog "ERROR" "NFS mount FAIL!";
   return 1
 fi
 }
@@ -200,10 +209,10 @@ local super="$(readcfg "super")";
 local result="$(timeout -k 10 10 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 if [[ "${super}" == "${result}" ]]
   then
-  echo "OK" > ${outputpath}/cfgstatus.mon;
+  echo "OK" > ${outputpath}/cfgstatus.mon;slog "INFO" "IceWarp config reset check OK.";
   return 0
   else
-  echo "FAIL" > ${outputpath}/cfgstatus.mon;
+  echo "FAIL" > ${outputpath}/cfgstatus.mon;slog "ERROR" "IceWarp config reset check FAIL!";
   return 1
 fi
 }
@@ -436,9 +445,9 @@ function smtpstat()
 {
 local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220" | head -1)"
 if [ "${SMTP_RESPONSE}" == "220" ]; then
-                        echo "OK" > ${outputpath}/smtpstatus.mon
+                        echo "OK" > ${outputpath}/smtpstatus.mon;slog "INFO" "IceWarp SMTP OK.";
                           else
-                        echo "FAIL" > ${outputpath}/smtpstatus.mon
+                        echo "FAIL" > ${outputpath}/smtpstatus.mon;slog "ERROR" "IceWarp SMTP FAIL!";
 fi
 }
 
@@ -447,9 +456,9 @@ function imapstat()
 {
 local IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
 if [ "${IMAP_RESPONSE}" == "OK" ]; then
-                        echo "OK" > ${outputpath}/imapstatus.mon
+                        echo "OK" > ${outputpath}/imapstatus.mon;slog "INFO" "IceWarp IMAP OK.";
                           else
-                        echo "FAIL" > ${outputpath}/imapstatus.mon
+                        echo "FAIL" > ${outputpath}/imapstatus.mon;slog "ERROR" "IceWarp SMTP FAIL!";
 fi
 }
 
@@ -458,9 +467,9 @@ function wcstat()
 {
 local HTTP_RESPONSE="$(curl -s -k --connect-timeout 5 -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
-                        echo "OK" > ${outputpath}/httpstatus.mon
+                        echo "OK" > ${outputpath}/httpstatus.mon;slog "INFO" "IceWarp HTTP OK.";
                           else
-                        echo "FAIL" > ${outputpath}/httpstatus.mon
+                        echo "FAIL" > ${outputpath}/httpstatus.mon;slog "ERROR" "IceWarp HTTP FAIL!";
 fi
 }
 
@@ -469,9 +478,9 @@ function xmppstat()
 {
 local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
 if [ "${XMPP_RESPONSE}" == "xmlns" ]; then
-                        echo "OK" > ${outputpath}/xmppstatus.mon
+                        echo "OK" > ${outputpath}/xmppstatus.mon;slog "INFO" "IceWarp XMPP OK.";
                           else
-                        echo "FAIL" > ${outputpath}/xmppstatus.mon
+                        echo "FAIL" > ${outputpath}/xmppstatus.mon;slog "ERROR" "IceWarp XMPP FAIL!";
 fi
 }
 
@@ -480,9 +489,9 @@ function grwstat()
 {
 local GRW_RESPONSE="$(echo "test" | nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
 if [ "${GRW_RESPONSE}" == "greeting" ]; then
-                        echo "OK" > ${outputpath}/grwstatus.mon
+                        echo "OK" > ${outputpath}/grwstatus.mon;slog "INFO" "IceWarp GRW OK.";
                           else
-                        echo "FAIL" > ${outputpath}/grwstatus.mon
+                        echo "FAIL" > ${outputpath}/grwstatus.mon;slog "ERROR" "IceWarp GRW FAIL!";
 fi
 }
 
@@ -519,7 +528,7 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
          then
          timeout -k 10 10 ${toolSh} create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
          local result=$?
-         if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Error creating test account";return 1;fi
+         if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;slog "ERROR" "Webclient error creating guest test account!";return 1;fi
      else
      local email="${guestaccemail}";
      fi
@@ -528,18 +537,38 @@ local start=`date +%s%N | cut -b1-13`
 # get admin auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
-if [ -z "${wcatoken}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 1 fail - Error getting webclient auth token from control";return 1;fi
+if [ -z "${wcatoken}" ];
+  then
+  local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+  slog "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
+  return 1;
+fi
 # impersonate webclient user
 local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
 local wclogin="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
-if [ -z "${wclogin}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 2 fail - Error impersonating webclient user";return 1;fi
+if [ -z "${wclogin}" ];
+  then
+  local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+  slog "ERROR" "Webclient Stage 2 fail - Error impersonating webclient user!";
+  return 1;
+fi
 # get user phpsessid
 local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "${wclogin}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
-if [ -z "${wcphpsessid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 3 fail - Error getting php session ID";return 1;fi
+if [ -z "${wcphpsessid}" ];
+  then
+  local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+  slog "ERROR" "Webclient Stage 3 fail - Error getting php session ID";
+  return 1;
+fi
 # auth user webclient session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
 local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
-if [ -z "${wcsid}" ];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;log "Stage 4 fail - Error logging to the webclient";return 1;fi
+if [ -z "${wcsid}" ];
+  then
+  local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+  slog "ERROR" "Webclient Stage 4 fail - Error logging to the webclient";
+  return 1;
+fi
 if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
     then
      # refresh folders standard account start
@@ -548,17 +577,17 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
      if [[ "${get_settings_response}" =~ "result" ]];
          then
-          local freturn=OK
+          local freturn=OK;slog "INFO" "Webclient check OK.";
          else
-          local freturn=FAIL;log "Stage 5 fail - Error getting settings, possible API problem";return 1;
+          local freturn=FAIL;slog "ERROR" "Stage 5 fail - Error getting settings, possible API problem";
      fi
      local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
      if [[ "${response}" =~ "INBOX" ]];
          then
-          local freturn=OK
+          local freturn=OK;slog "INFO" "Webclient check OK.";
          else
-          local freturn=FAIL;log "Stage 6 fail - No INBOX in folder sync response";
+          local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
      fi # refresh folders standard account end
      else
      # refresh folders teamchat guest account start
@@ -566,9 +595,9 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
      if [[ "${response}" =~ "INHERITED_ACL" ]];
          then
-          local freturn=OK
+          local freturn=OK;slog "INFO" "Webclient guest login check OK.";
          else
-          local freturn=FAIL
+          local freturn=FAIL;slog "ERROR" "Webclient guest login check FAIL!";
      fi # refresh folders teamchat guest account end
 fi
 # session logout
@@ -596,9 +625,9 @@ local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 if [[ $result == *$FOLDER* ]]
 then
-local freturn=OK
+local freturn=OK;slog "INFO" "ActiveSync login check OK.";
 else
-local freturn=FAIL
+local freturn=FAIL;slog "ERROR" "ActiveSync login check FAIL!";
 fi
 echo "${freturn}" > ${outputpath}/easstatus.mon;
 echo "${runtime}" > ${outputpath}/easruntime.mon;
