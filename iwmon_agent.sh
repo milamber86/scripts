@@ -114,6 +114,7 @@ declare DBUSER=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBUser | sed -
 declare DBPASS=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
 read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
 read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
+timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_EnableGlobalAdmin 1 > /dev/null 2>&1
 timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
 timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
 declare PASS=$(timeout -k 3 3 ${toolSh} export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
