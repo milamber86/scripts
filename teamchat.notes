@@ -1,0 +1,7 @@
+- disable default notifications
+ALTER TABLE EventGroup ALTER GrpTChUploadNotify SET DEFAULT 0;
+ALTER TABLE EventGroup ALTER GrpTchPinNotify SET DEFAULT 0;
+ALTER TABLE EventGroup ALTER GrpTChMentionNotify SET DEFAULT 0;
+UPDATE EventGroup SET GrpTChUploadNotify = 0;
+UPDATE EventGroup SET GrpTchPinNotify = 0;
+UPDATE EventGroup SET GrpTChMentionNotify = 0;
