@@ -459,7 +459,7 @@ local IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK
 if [ "${IMAP_RESPONSE}" == "OK" ]; then
                         echo "OK" > ${outputpath}/imapstatus.mon;slog "INFO" "IceWarp IMAP OK.";
                           else
-                        echo "FAIL" > ${outputpath}/imapstatus.mon;slog "ERROR" "IceWarp SMTP FAIL!";
+                        echo "FAIL" > ${outputpath}/imapstatus.mon;slog "ERROR" "IceWarp IMAP FAIL!";
 fi
 }
 
