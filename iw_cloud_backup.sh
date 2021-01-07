@@ -1,6 +1,7 @@
 #!/bin/bash
-# ver. 20201118_02
+# ver. 20210108_01
 source /etc/icewarp/icewarp.conf
+if testconfigpath="$(head -1 /opt/icewarp/path.dat 2>/dev/null)"; then iwconfigpath="$(echo ${testconfigpath} | tr -d '\r')"; else iwconfigpath="${IWS_INSTALL_DIR}/config"; fi
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
 scriptdir="$(cd $(dirname $0) && pwd)"
@@ -92,27 +93,27 @@ echo "${dcdbname}"
 eas) local easdbname="$(${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | ${IWS_INSTALL_DIR}/tool.sh get system c_activesync_dbconnection | egrep -o "mysql:host=.*;dbname=.*" | perl -pe 's|^mysql:host=.*;port=.*;dbname=(.*)$|\1|')";
 echo "${easdbname}"
 ;;
-wc) local wcdbname="$(cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\3|')";
+wc) local wcdbname="$(cat ${iwconfigpath}/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\3|')";
 echo "${wcdbname}"
 esac
 }
 
 function discover_creds() # ( -> username password )
 {
-local dbuser="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
-local dbpass="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
+local dbuser="$(/usr/bin/cat ${iwconfigpath}/_webmail/server.xml | egrep -o "<dbuser>.*</dbuser>" | perl -pe 's|^\<dbuser\>(.*)\</dbuser\>$|\1|')";
+local dbpass="$(/usr/bin/cat ${iwconfigpath}/_webmail/server.xml | cat ${iwconfigpath}/_webmail/server.xml | egrep -o "<dbpass>.*</dbpass>" | perl -pe 's|^\<dbpass\>(.*)\</dbpass\>$|\1|' | perl -MHTML::Entities -pe 'decode_entities($_);')";
 echo "${dbuser} ${dbpass}"
 }
 
 function discover_dbhost() # ( -> db connection IP/hostname )
 {
-local dbhost="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
+local dbhost="$(/usr/bin/cat ${iwconfigpath}/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\1|')";
 echo "${dbhost}"
 }
 
 function discover_dbport() # ( -> db connection port )
 {
-local dbport="$(/usr/bin/cat ${IWS_INSTALL_DIR}/config/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\2|')";
+local dbport="$(/usr/bin/cat ${iwconfigpath}/_webmail/server.xml | egrep -o "<dbconn>mysql:host=.*;port=.*;dbname=.*</dbconn>" | perl -pe 's|^\<dbconn\>mysql:host=(.*);port=(.*);dbname=(.*)\</dbconn\>$|\2|')";
 echo "${dbport}"
 }
 
@@ -180,7 +181,7 @@ for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbck
         fi
       else
         sizeK=$(du -k ${ref} | awk '{print $1}');
-        if [[ ${sizeK} -le 8 ]]
+        if [[ ${sizeK} -le 1 ]]
           then
             log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
           else
