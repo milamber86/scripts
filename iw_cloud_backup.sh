@@ -167,6 +167,7 @@ ${IWS_INSTALL_DIR}/tool.sh export account "*@*" u_backup > ${accbckfile}
 ${IWS_INSTALL_DIR}/tool.sh export domain "*" d_backup > ${dombckfile}
 log "Finished IW config backup."
 log "Checking all backupfiles are created."
+sleep 10;
 for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbckfile cnfbckfile calbckfile logbckfile accbckfile dombckfile;
   do
     eval ref=\$${I};
