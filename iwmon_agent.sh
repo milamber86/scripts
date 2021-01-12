@@ -578,7 +578,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
      if [[ "${get_settings_response}" =~ "result" ]];
          then
-          local freturn=OK;slog "INFO" "Webclient check OK.";
+          local freturn=OK;
          else
           local freturn=FAIL;slog "ERROR" "Stage 5 fail - Error getting settings, possible API problem";
      fi
@@ -586,7 +586,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
      if [[ "${response}" =~ "INBOX" ]];
          then
-          local freturn=OK;slog "INFO" "Webclient check OK.";
+          local freturn=OK;slog "INFO" "Webclient user login check OK.";
          else
           local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
      fi # refresh folders standard account end
