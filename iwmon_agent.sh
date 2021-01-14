@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20201217_001
+# ver. 20210114_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -9,6 +9,10 @@
 # UserParameter=icewarp.iwver,/opt/icewarp/scripts/iwmon.sh "iwver";cat /opt/icewarp/var/iwverstatus.mon
 # UserParameter=icewarp.cfg,/opt/icewarp/scripts/iwmon.sh "cfg";cat /opt/icewarp/var/cfgstatus.mon
 # UserParameter=icewarp.nfs,/opt/icewarp/scripts/iwmon.sh "nfs";cat /opt/icewarp/var/nfsmntstatus.mon
+# UserParameter=icewarp.nfsreadstat,/opt/icewarp/scripts/iwmon.sh "nfsreadspeed";cat /opt/icewarp/var/nfsreadstatus.mon
+# UserParameter=icewarp.nfsreadspeed,cat /opt/icewarp/var/nfsreadspeed.mon
+# UserParameter=icewarp.nfswritestat,/opt/icewarp/scripts/iwmon.sh "nfswritespeed";cat /opt/icewarp/var/nfswritestatus.mon
+# UserParameter=icewarp.nfswritespeed,cat /opt/icewarp/var/nfswritespeed.mon
 # UserParameter=icewarp.smtp,/opt/icewarp/scripts/iwmon.sh "smtp";cat /opt/icewarp/var/smtpstatus.mon
 # UserParameter=icewarp.imap,/opt/icewarp/scripts/iwmon.sh "imap";cat /opt/icewarp/var/imapstatus.mon
 # UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
@@ -41,19 +45,21 @@
 #VARS
 HOST="127.0.0.1";
 SNMPPORT="161"
-ctimeout=30;
+ctimeout=15;
 EASFOLDER="INBOX";
 scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
-admemail="admuser"                                           # full IceWarp server admin credentials for impersonated checks
-admpass="admpass";                                           # password ^
-email="test_user";                                           # email address, standard user must exist, guest user will be created by this script if it does not exist
+toolSh="/opt/icewarp/tool.sh";
+admemail="globaladmin"                                       # full IceWarp server admin credentials for impersonated checks
+# admpass="$(readcfg 'globaladm')";                          # password ^
+email="webtest@service.local";                               # email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="guestpass";                                            # password for guest account ( only for webclient login quest account check )
 wcguest=0;                                                   # 0 - use standard account for webclient check, 1 - use autocreated guest account for webclient check and check using login to teamchat ( must be enabled )
 outputpath="/opt/icewarp/var";                               # results output path
-nfstestfile="/mnt/data/storage.dat"                          # path to nfs mount test file ( must exist )
-toolSh="/opt/icewarp/tool.sh";
+nfstestfile="/mnt/maildata/storage.dat"                      # path to nfs mount test file ( must exist )
+nfstestdir="/mnt/maildata/tmp/"                              # path to nfs mount test directory ( must exist )
+nfsmaxspeed=5000                                             # maximal allowed access time for storage in ms
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 /usr/bin/touch "${scriptdir}/iwmon.cfg"
 /usr/bin/chmod 600 "${scriptdir}/iwmon.cfg"
@@ -65,7 +71,7 @@ function slog
 local logsvr="${1}";
 local logmsg="${2}";
 local logdate="$(date '+%b %d %H:%M:%S')";
-/usr/bin/logger "${logdate} ${HOSTNAME} IWMON: ${logsvr} ${logmsg}"
+timeout -k 2 2 /usr/bin/logger "${logdate} ${HOSTNAME} IWMON: ${logsvr} ${logmsg}"
 }
 
 # write setting to configfile
@@ -108,13 +114,16 @@ if [ -f "${FILE}" ]
 fi
 writecfg "mail_outpath" "${mail_outpath}";
 writecfg "mail_inpath" "${mail_inpath}";
+${toolSh} set system C_Accounts_Policies_EnableGlobalAdmin 1
+${toolSh} set system C_Accounts_Policies_RegenerateGlobalAdminPassword 1
 local super="$(timeout -k 30 30 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 writecfg "super" "${super}";
+local admpass="$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system 'c_accounts_policies_globaladminpassword' | awk '{print $2}')";
+writecfg "globaladm" "${admpass}";
 declare DBUSER=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBUser | sed -r 's|^C_ActiveSync_DBUser: (.*)$|\1|')
 declare DBPASS=$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBPass | sed -r 's|^C_ActiveSync_DBPass: (.*)$|\1|')
 read DBHOST DBPORT DBNAME <<<$(timeout -k 3 3 ${toolSh} get system C_ActiveSync_DBConnection | sed -r 's|^C_ActiveSync_DBConnection: mysql:host=(.*);port=(.*);dbname=(.*)$|\1 \2 \3|')
 read -r USER aURI aTYPE aVER aKEY <<<$(echo "select * from devices order by last_sync asc\\G" | timeout -k 3 3 mysql -u ${DBUSER} -p${DBPASS} -h ${DBHOST} -P ${DBPORT} ${DBNAME} | tail -24 | egrep "user_id:|uri:|type:|protocol_version:|synckey:" | xargs -n1 -d'\n' | tr -d '\040\011\015\012' | sed -r 's|^user_id:(.*)uri:(.*)type:(.*)protocol_version:(.*)synckey:(.*)$|\1 \2 \3 \4 \5|')
-timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_EnableGlobalAdmin 1 > /dev/null 2>&1
 timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 0 > /dev/null 2>&1
 timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_AllowAdminPass 1 > /dev/null 2>&1
 declare PASS=$(timeout -k 3 3 ${toolSh} export account "${USER}" u_password | sed -r 's|^.*,(.*),$|\1|')
@@ -171,6 +180,18 @@ if [[ ${?} -ne 0 ]]
   log "Installing net-snmp-utils"
   /usr/bin/yum -y install net-snmp-utils
 fi
+which ioping > /dev/null 2>&1
+if [[ ${?} -ne 0 ]]
+  then
+  log "Installing ioping"
+  /usr/bin/yum -y install ioping
+fi
+which bc > /dev/null 2>&1
+if [[ ${?} -ne 0 ]]
+  then
+  log "Installing bc"
+  /usr/bin/yum -y install bc
+fi
 if [ ! -f ${scriptdir}/activesync.txt ]
   then
   cd "${scriptdir}"
@@ -207,7 +228,14 @@ fi
 function cfgstat()
 {
 local super="$(readcfg "super")";
-local result="$(timeout -k 10 10 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
+local tst="$(timeout -k 6 6 ${toolSh} get system C_Accounts_Policies_SuperUserPassword)"
+if [[ $? -eq 0 ]]
+  then
+  local result="$(echo "${tst}" | awk '{print $2}')";
+  else
+  echo "NA" > ${outputpath}/cfgstatus.mon;slog "ERROR" "Failed to get value from API using tool.sh during IceWarp config check!";
+  return 1
+fi
 if [[ "${super}" == "${result}" ]]
   then
   echo "OK" > ${outputpath}/cfgstatus.mon;slog "INFO" "IceWarp config reset check OK.";
@@ -444,7 +472,7 @@ esac
 # iw smtp server simple check
 function smtpstat()
 {
-local SMTP_RESPONSE="$(echo "QUIT" | nc -w 3 "${HOST}" 25 | egrep -o "^220" | head -1)"
+local SMTP_RESPONSE="$(echo "QUIT" | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 25 | egrep -o "^220" | head -1)"
 if [ "${SMTP_RESPONSE}" == "220" ]; then
                         echo "OK" > ${outputpath}/smtpstatus.mon;slog "INFO" "IceWarp SMTP OK.";
                           else
@@ -455,7 +483,7 @@ fi
 # iw imap server simple check
 function imapstat()
 {
-local IMAP_RESPONSE="$(echo ". logout" | nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
+local IMAP_RESPONSE="$(echo ". logout" | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 143 | egrep -o "\* OK " | egrep -o "OK")"
 if [ "${IMAP_RESPONSE}" == "OK" ]; then
                         echo "OK" > ${outputpath}/imapstatus.mon;slog "INFO" "IceWarp IMAP OK.";
                           else
@@ -466,7 +494,7 @@ fi
 # iw web server simple check
 function wcstat()
 {
-local HTTP_RESPONSE="$(curl -s -k --connect-timeout 5 -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
+local HTTP_RESPONSE="$(timeout -k ${ctimeout} ${ctimeout} curl -s -k --connect-timeout 5 -o /dev/null -w "%{http_code}" -m 5 https://"${HOST}"/webmail/)"
 if [ "${HTTP_RESPONSE}" == "200" ]; then
                         echo "OK" > ${outputpath}/httpstatus.mon;slog "INFO" "IceWarp HTTP OK.";
                           else
@@ -477,7 +505,7 @@ fi
 # iw xmpp server simple check
 function xmppstat()
 {
-local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
+local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" |egrep -o "xmlns")"
 if [ "${XMPP_RESPONSE}" == "xmlns" ]; then
                         echo "OK" > ${outputpath}/xmppstatus.mon;slog "INFO" "IceWarp XMPP OK.";
                           else
@@ -488,7 +516,7 @@ fi
 # iw groupware server simple check
 function grwstat()
 {
-local GRW_RESPONSE="$(echo "test" | nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
+local GRW_RESPONSE="$(echo "test" | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 5229 | egrep -o "<greeting" | egrep -o "greeting")"
 if [ "${GRW_RESPONSE}" == "greeting" ]; then
                         echo "OK" > ${outputpath}/grwstatus.mon;slog "INFO" "IceWarp GRW OK.";
                           else
@@ -535,9 +563,10 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
+local admpass="$(readcfg 'globaladm')";
 # get admin auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
-local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
+local wcatoken="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
 if [ -z "${wcatoken}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -546,7 +575,8 @@ if [ -z "${wcatoken}" ];
 fi
 # impersonate webclient user
 local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
-local wclogin="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
+local wclogintmp="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
+wclogin="$(echo ${wclogintmp} | sed -r 's|//.*/webmail/|//127.0.0.1/webmail/|')";
 if [ -z "${wclogin}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -554,7 +584,7 @@ if [ -z "${wclogin}" ];
   return 1;
 fi
 # get user phpsessid
-local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "${wclogin}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+local wcphpsessid="$(curl -s --connect-timeout 8 -m 8 -ikL "${wclogin}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 if [ -z "${wcphpsessid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -563,7 +593,7 @@ if [ -z "${wcphpsessid}" ];
 fi
 # auth user webclient session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
-local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+local wcsid="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
 if [ -z "${wcsid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -578,7 +608,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
      if [[ "${get_settings_response}" =~ "result" ]];
          then
-          local freturn=OK;
+          local freturn=OK;slog "INFO" "Webclient check OK.";
          else
           local freturn=FAIL;slog "ERROR" "Stage 5 fail - Error getting settings, possible API problem";
      fi
@@ -586,7 +616,7 @@ if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
      local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
      if [[ "${response}" =~ "INBOX" ]];
          then
-          local freturn=OK;slog "INFO" "Webclient user login check OK.";
+          local freturn=OK;slog "INFO" "Webclient check OK.";
          else
           local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
      fi # refresh folders standard account end
@@ -608,6 +638,46 @@ local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 echo "${freturn}" > ${outputpath}/wcstatus.mon;
 echo "${runtime}" > ${outputpath}/wcruntime.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
+}
+
+# nfs storage write speed healthcheck
+function nfswritespeed()
+{
+local max=$((nfsmaxspeed*1000))
+
+# grep AVG speed for ioping test
+result=$(/usr/bin/ioping -c 4 -BDW ${nfstestdir} | tail -1 | awk '{print $7}')
+#echo "write speed: $((result/1000)) us"
+
+if [ $result -lt $max ]; then
+  local freturn=OK;slog "INFO" "NFS write speed is OK.";
+else
+  local freturn=FAIL;slog "ERROR" "NFS write speed FAIL! Is slower than $nfsmaxspeed ms.";
+fi
+
+echo "${freturn}" > ${outputpath}/nfswritestatus.mon;
+echo "$(dc <<<"2 k $result 1000 / p" | awk '{printf "%f", $0}')" > ${outputpath}/nfswritespeed.mon;
+if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
+}
+
+# nfs storage read speed healthcheck
+function nfsreadspeed()
+{
+local max=$((nfsmaxspeed*1000))
+
+# grep AVG speed for ioping test
+result=$(/usr/bin/ioping -c 4 -BD ${nfstestdir} | tail -1 | awk '{print $7}')
+#echo "read speed: $((result/1000)) us"
+
+if [ $result -lt $max ]; then
+  local freturn=OK;slog "INFO" "NFS read speed is OK.";
+else
+  local freturn=FAIL;slog "ERROR" "NFS read speed FAIL! Is slower than $nfsmaxspeed ms.";
+fi
+
+echo "${freturn}" > ${outputpath}/nfsreadstatus.mon;
+echo "$(dc <<<"2 k $result 1000 / p" | awk '{printf "%f", $0}')" > ${outputpath}/nfsreadspeed.mon;
 if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
@@ -635,11 +705,12 @@ echo "${runtime}" > ${outputpath}/easruntime.mon;
 if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
 }
 
+# print all stats for "all verbose" mode
 function printStats() {
 echo "IceWarp stats for ${HOSTNAME} at $(date)"
 echo "last value update - service: check result"
 echo "--- Status ( OK | FAIL ):"
-for SIMPLECHECK in smtp imap xmpp grw http nfsmnt cfg iwver iwbackup
+for SIMPLECHECK in iwver smtp imap xmpp grw http nfsmnt nfsread nfswrite cfg iwbackup
     do
     echo -n "$(stat -c'%y' "${outputpath}/${SIMPLECHECK}status.mon") - "
     echo -n "${SIMPLECHECK}: "
@@ -671,14 +742,19 @@ echo -n "$(stat -c'%y' "${outputpath}/wcstatus.mon") - "
 echo -n "WebClient login: "
 cat "${outputpath}/wcstatus.mon"
 echo -n "$(stat -c'%y' "${outputpath}/wcruntime.mon") - "
-echo -n "time spent: "
+echo -n "time spent (ms): "
 cat "${outputpath}/wcruntime.mon"
 echo -n "$(stat -c'%y' "${outputpath}/easstatus.mon") - "
 echo -n "ActiveSync login: "
 cat "${outputpath}/easstatus.mon"
 echo -n "$(stat -c'%y' "${outputpath}/easruntime.mon") - "
-echo -n "time spent: "
+echo -n "time spent (ms): "
 cat "${outputpath}/easruntime.mon"
+echo "--- NFS speed stats (ms):"
+echo -n "$(stat -c'%y' "${outputpath}/nfsreadspeed.mon") - read: "
+cat "${outputpath}/nfsreadspeed.mon"
+echo -n "$(stat -c'%y' "${outputpath}/nfswritespeed.mon") - write: "
+cat "${outputpath}/nfswritespeed.mon"
 }
 
 function printUsage() {
@@ -689,7 +765,7 @@ Synopsis
     checks and installs dependencies, sets initial runtime configuration
 
     iwmon.sh check_name [ check_parameter ]
-    supported health-checks: iwbackup, iwver, cfg, nfs, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
+    supported health-checks: iwbackup, iwver, cfg, nfs, nfsreadspeed, nfswritespeed, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
 
     iwmon.sh connstat [ service_name ]
     supported services: smtp, imap, xmpp, grw, http
@@ -725,6 +801,10 @@ cfg) cfgstat;
 ;;
 nfs) nfsmntstat;
 ;;
+nfsreadspeed) nfsreadspeed;
+;;
+nfswritespeed) nfswritespeed;
+;;
 smtp) smtpstat;
 ;;
 imap) imapstat;
@@ -745,14 +825,14 @@ queuestat) queuestat "${2}";
 ;;
 all) if [[ "${2}" == "verbose" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;iwbackupcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;cfgstat;iwvercheck;iwbackupcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
