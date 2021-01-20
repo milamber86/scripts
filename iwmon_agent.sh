@@ -457,7 +457,7 @@ inc)  local queue_incoming_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mai
                            echo "9999" > ${outputpath}/queuestat_inc.mon;
       fi
 ;;
-retr) local queue_outgoing_retry_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath}retry/ -type f | wc -l);
+retr) local queue_outgoing_retry_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath}retry/ ${mail_outpath}priority_* -type f | wc -l);
       if [[ ${?} -eq 0 ]]; then
                            echo "${queue_outgoing_retry_count}" > ${outputpath}/queuestat_retr.mon;
                            else
