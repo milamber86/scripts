@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20210114_001
+# ver. 20210122_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -53,7 +53,7 @@ logfile="${scriptdir}/iwmon_${logdate}.log"
 toolSh="/opt/icewarp/tool.sh";
 admemail="globaladmin"                                       # full IceWarp server admin credentials for impersonated checks
 # admpass="$(readcfg 'globaladm')";                          # password ^
-email="webtest@service.local";                               # email address, standard user must exist, guest user will be created by this script if it does not exist
+# email="admin@service.local"; # iwmon.cfg:wctestemail       # email address, standard user must exist, guest user will be created by this script if it does not exist
 pass="guestpass";                                            # password for guest account ( only for webclient login quest account check )
 wcguest=0;                                                   # 0 - use standard account for webclient check, 1 - use autocreated guest account for webclient check and check using login to teamchat ( must be enabled )
 outputpath="/opt/icewarp/var";                               # results output path
@@ -115,7 +115,6 @@ fi
 writecfg "mail_outpath" "${mail_outpath}";
 writecfg "mail_inpath" "${mail_inpath}";
 ${toolSh} set system C_Accounts_Policies_EnableGlobalAdmin 1
-${toolSh} set system C_Accounts_Policies_RegenerateGlobalAdminPassword 1
 local super="$(timeout -k 30 30 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 writecfg "super" "${super}";
 local admpass="$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system 'c_accounts_policies_globaladminpassword' | awk '{print $2}')";
@@ -132,6 +131,10 @@ timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 1 > /dev
 writecfg "EASUser" "${USER}"
 writecfg "EASPass" "${PASS}"
 writecfg "EASVers" "${aVER}"
+echo "Select and configure test account email for webclient monitoring."
+echo "Example config for account webtest@testdomain.local:"
+echo
+echo 'echo "wctestemail:webtest@testdomain.loc" >> /opt/icewarp/scripts/iwmon.cfg'
 }
 
 # install dependencies
@@ -563,15 +566,40 @@ if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exi
      fi
 fi
 local start=`date +%s%N | cut -b1-13`
+local email="$(readcfg 'wctestemail')";
 local admpass="$(readcfg 'globaladm')";
 # get admin auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
 if [ -z "${wcatoken}" ];
   then
-  local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
-  slog "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
-  return 1;
+  local testadmpass="$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system 'c_accounts_policies_globaladminpassword')";
+  if [[ ${?} -eq 0 ]]
+    then
+    local newadmpass="$(echo "${testadmpass}" | awk '{print $2}')";
+    if [[ "${newadmpass}" != "${admpass}" ]]
+      then
+      admpass="${newadmpass}";
+      local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
+      local wcatoken="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
+      if [ -z "${wcatoken}" ];
+        then
+        local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+        slog "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
+        return 1;
+        else
+        writecfg "globaladm" "${admpass}"
+      fi
+      else
+      local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+      slog "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
+      return 1;
+    fi
+    else
+    local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
+    slog "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
+    return 1;
+  fi
 fi
 # impersonate webclient user
 local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
