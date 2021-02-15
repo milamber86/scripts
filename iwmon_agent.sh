@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20210122_001
+# ver. 20210215_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -18,7 +18,7 @@
 # UserParameter=icewarp.http,/opt/icewarp/scripts/iwmon.sh "wc";cat /opt/icewarp/var/httpstatus.mon
 # UserParameter=icewarp.xmpp,/opt/icewarp/scripts/iwmon.sh "xmpp";cat /opt/icewarp/var/xmppstatus.mon
 # UserParameter=icewarp.grw,/opt/icewarp/scripts/iwmon.sh "grw";cat /opt/icewarp/var/grwstatus.mon
-# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin" "0";cat /opt/icewarp/var/wcstatus.mon
+# UserParameter=icewarp.wcresult,/opt/icewarp/scripts/iwmon.sh "wclogin";cat /opt/icewarp/var/wcstatus.mon
 # UserParameter=icewarp.wcspeed,cat /opt/icewarp/var/wcruntime.mon
 # UserParameter=icewarp.easresult,/opt/icewarp/scripts/iwmon.sh "easlogin";cat /opt/icewarp/var/easstatus.mon
 # UserParameter=icewarp.easspeed,cat /opt/icewarp/var/easruntime.mon
@@ -51,11 +51,6 @@ scriptdir="$(cd $(dirname $0) && pwd)"
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
 toolSh="/opt/icewarp/tool.sh";
-admemail="globaladmin"                                       # full IceWarp server admin credentials for impersonated checks
-# admpass="$(readcfg 'globaladm')";                          # password ^
-# email="admin@service.local"; # iwmon.cfg:wctestemail       # email address, standard user must exist, guest user will be created by this script if it does not exist
-pass="guestpass";                                            # password for guest account ( only for webclient login quest account check )
-wcguest=0;                                                   # 0 - use standard account for webclient check, 1 - use autocreated guest account for webclient check and check using login to teamchat ( must be enabled )
 outputpath="/opt/icewarp/var";                               # results output path
 nfstestfile="/mnt/maildata/storage.dat"                      # path to nfs mount test file ( must exist )
 nfstestdir="/mnt/maildata/tmp/"                              # path to nfs mount test directory ( must exist )
@@ -101,6 +96,7 @@ fi
 # set initial settings to iwmon.cfg
 function init()
 {
+mkdir -p ${nfstestdir}
 local FILE="/opt/icewarp/path.dat"
 if [ -f "${FILE}" ]
   then
@@ -546,27 +542,12 @@ function rawurlencode() {
 }
 
 # iw web client login healthcheck
-function wccheck() # ( guest 0/1 -> OK, FAIL; time spent in ms )
+function wccheck() # ( -> OK, FAIL; time spent in ms )
 {
-local guest=${1}
 local iwserver="${HOST}"
-if [[ ${guest} != 0 ]] # generate guest account email, test if guest account exists, if not, create one
-    then
-     local guestaccemail="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1_\2\@##internalservicedomain.icewarp.com##|')"  # generate teamchat guest account email
-     local guestacclogin="$(echo ${email} | sed -r s'|(.*)\@(.*)|\1|')"
-     timeout -k 10 10 ${toolSh} export account "${guestaccemail}" u_name | grep -o ",${guestacclogin}," > /dev/null 2>&1
-     local result=$?
-     if [[ ${result} != 0 ]]
-         then
-         timeout -k 10 10 ${toolSh} create account "${guestaccemail}" u_name "${guestacclogin}" u_mailbox "${email}" u_password "${pass}"
-         local result=$?
-         if [[ ${result} != 0 ]];then local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;slog "ERROR" "Webclient error creating guest test account!";return 1;fi
-     else
-     local email="${guestaccemail}";
-     fi
-fi
 local start=`date +%s%N | cut -b1-13`
 local email="$(readcfg 'wctestemail')";
+local admemail="globaladmin";
 local admpass="$(readcfg 'globaladm')";
 # get admin auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
@@ -625,39 +606,26 @@ local wcsid="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${auth_reque
 if [ -z "${wcsid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
-  slog "ERROR" "Webclient Stage 4 fail - Error logging to the webclient";
+  slog "ERROR" "Webclient Stage 4 fail - Error logging to the webclient ( check PHP session store is available if Redis/KeyDB used )";
   return 1;
 fi
-if [[ ${guest} == 0 ]] # test response for standard or teamchat guest account
-    then
-     # refresh folders standard account start
-     # get settings
-     get_settings_request="<iq sid=\"wm-"${wcsid}"\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:private\"><resources><skins/><banner_options/><im/><sip/><chat/><mail_settings_default/><mail_settings_general/><login_settings/><layout_settings/><homepage_settings/><calendar_settings/><default_calendar_settings/><cookie_settings/><default_reminder_settings/><event_settings/><spellchecker_languages/><signature/><groups/><restrictions/><aliases/><read_confirmation/><global_settings/><paths/><streamhost/><password_policy/><fonts/><certificate/><timezones/><external_settings/><gw_mygroup/><default_folders/><documents/></resources></query></iq>";
-     get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
-     if [[ "${get_settings_response}" =~ "result" ]];
-         then
-          local freturn=OK;
-         else
-          local freturn=FAIL;slog "ERROR" "Stage 5 fail - Error getting settings, possible API problem";
-     fi
-     local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
-     local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
-     if [[ "${response}" =~ "INBOX" ]];
-         then
-          local freturn=OK;slog "INFO" "Webclient check OK.";
-         else
-          local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
-     fi # refresh folders standard account end
-     else
-     # refresh folders teamchat guest account start
-     local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${guestaccemail}\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:folders\"><account uid=\"${guestaccemail}\"/></query></iq>"
-     local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "INHERITED_ACL" | head -1)"
-     if [[ "${response}" =~ "INHERITED_ACL" ]];
-         then
-          local freturn=OK;slog "INFO" "Webclient guest login check OK.";
-         else
-          local freturn=FAIL;slog "ERROR" "Webclient guest login check FAIL!";
-     fi # refresh folders teamchat guest account end
+# get settings
+get_settings_request="<iq sid=\"wm-"${wcsid}"\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:private\"><resources><skins/><banner_options/><im/><sip/><chat/><mail_settings_default/><mail_settings_general/><login_settings/><layout_settings/><homepage_settings/><calendar_settings/><default_calendar_settings/><cookie_settings/><default_reminder_settings/><event_settings/><spellchecker_languages/><signature/><groups/><restrictions/><aliases/><read_confirmation/><global_settings/><paths/><streamhost/><password_policy/><fonts/><certificate/><timezones/><external_settings/><gw_mygroup/><default_folders/><documents/></resources></query></iq>";
+get_settings_response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${get_settings_request}" "https://${iwserver}/webmail/server/webmail.php")";
+if [[ "${get_settings_response}" =~ "result" ]];
+  then
+   local freturn=OK;
+  else
+   local freturn=FAIL;slog "ERROR" "Stage 5 fail - Error getting settings, possible API problem";
+fi
+# refresh folders and look for INBOX
+local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"set\" format=\"xml\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>"
+local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
+if [[ "${response}" =~ "INBOX" ]];
+  then
+   local freturn=OK;slog "INFO" "Webclient check OK.";
+  else
+   local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
 fi
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
@@ -793,7 +761,7 @@ Synopsis
     checks and installs dependencies, sets initial runtime configuration
 
     iwmon.sh check_name [ check_parameter ]
-    supported health-checks: iwbackup, iwver, cfg, nfs, nfsreadspeed, nfswritespeed, smtp, imap, xmpp, grw, wc, wclogin ( guest 0/1 parameter ), easlogin
+    supported health-checks: iwbackup, iwver, cfg, nfs, nfsreadspeed, nfswritespeed, smtp, imap, xmpp, grw, wc, wclogin, easlogin
 
     iwmon.sh connstat [ service_name ]
     supported services: smtp, imap, xmpp, grw, http
@@ -843,7 +811,7 @@ grw) grwstat;
 ;;
 wc) wcstat;
 ;;
-wclogin) wccheck "${2}";
+wclogin) wccheck;
 ;;
 easlogin) eascheck;
 ;;
@@ -853,14 +821,14 @@ queuestat) queuestat "${2}";
 ;;
 all) if [[ "${2}" == "verbose" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck;eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
-        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck "${wcguest}";eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
+        smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck;eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
         for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
      fi
