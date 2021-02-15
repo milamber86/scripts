@@ -52,8 +52,8 @@ logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/iwmon_${logdate}.log"
 toolSh="/opt/icewarp/tool.sh";
 outputpath="/opt/icewarp/var";                               # results output path
-nfstestfile="/mnt/maildata/storage.dat"                      # path to nfs mount test file ( must exist )
-nfstestdir="/mnt/maildata/tmp/"                              # path to nfs mount test directory ( must exist )
+nfstestfile="/mnt/maildata/storage.dat"                      # path to nfs mount test file
+nfstestdir="/mnt/maildata/tmp/"                              # path to nfs mount test directory
 nfsmaxspeed=5000                                             # maximal allowed access time for storage in ms
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 /usr/bin/touch "${scriptdir}/iwmon.cfg"
@@ -96,7 +96,8 @@ fi
 # set initial settings to iwmon.cfg
 function init()
 {
-mkdir -p ${nfstestdir}
+mkdir -p "${nfstestdir}"
+touch "${nfstestfile}"
 local FILE="/opt/icewarp/path.dat"
 if [ -f "${FILE}" ]
   then
