@@ -2,29 +2,36 @@
 Návod na nastavení DNS záznamů pro mail doménu examplesomewhere.com:
 -- A
 DNS A 3600 example.somewhere.com -> 66.77.88.99
+
 -- MX
 DNS MX 3600 0 @examplesomewhere.com -> example.somewhere.com
+
 -- A autodiscover
 SmartDiscover (A) 'autodiscover.examplesomewhere.com':
 A 3600 autodiscover.examplesomewhere.com -> 66.77.88.99
+
 -- SRV autodiscover
 SmartDiscover (SRV) '_autodiscover._tcp.examplesomewhere.com':
 SRV 10 0 443 example.somewhere.com
+
 -- SRV caldav
 WebDAV (SRV) '_caldav._tcp.examplesomewhere.com':
 SRV 10 0 80 example.somewhere.com
 WebDAV (SRV) '_caldavs._tcp.examplesomewhere.com':
 SRV 10 0 443 example.somewhere.com
+
 -- SRV carddav
 WebDAV (SRV) '_carddav._tcp.examplesomewhere.com':
 SRV 10 0 80 example.somewhere.com
 WebDAV (SRV) '_carddavs._tcp.examplesomewhere.com':
 SRV 10 0 443 example.somewhere.com
+
 -- SRV instant messaging
 Instant Messaging (SRV) '_xmpp-server._tcp.examplesomewhere.com':
 SRV 10 0 5222 example.somewhere.com
 Instant Messaging (SRV) '_xmpp-client._tcp.examplesomewhere.com':
 SRV 10 0 5222 example.somewhere.com
+
 --SRV iSchedule (Apple Mac)
 iSchedule (SRV) '_ischedule._tcp.examplesomewhere.com':
 SRV 10 10 443 example.somewhere.com
