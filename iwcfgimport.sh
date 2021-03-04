@@ -3,7 +3,7 @@ function setval()
 {
 prop="${1}";
 val="${2}";
-echo -n "Setting ${prop} = ${val} ..";
+echo -n "${prop} = ${val} .. ";
 /opt/icewarp/tool.sh set system ${prop} "${val}"
 return $?
 }
