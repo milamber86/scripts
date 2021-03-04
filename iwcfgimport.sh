@@ -15,6 +15,10 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath accDb
       ;;
       archivePath) /opt/icewarp/tool.sh set system C_System_Tools_AutoArchive_Path "${val}"
       ;;
+      tempPath) /opt/icewarp/tool.sh set system C_System_Storage_Dir_TempPath "${val}"
+      ;;
+      logsPath) /opt/icewarp/tool.sh set system C_System_Storage_Dir_LogPath "${val}"
+      ;;
       accDbConn) /opt/icewarp/tool.sh set system c_system_storage_accounts_odbcconnstring "${val}"
       ;;
       dcDbConn) /opt/icewarp/tool.sh set system c_accounts_global_accounts_directorycacheconnectionstring "${val}"
