@@ -1,3 +1,4 @@
+#!/bin/bash
 cfgImportFile=/root/cfgexport.cf
 function setval()
 {
