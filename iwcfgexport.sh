@@ -1,3 +1,4 @@
+#!/bin/bash
 cfgExportFile=/root/cfgexport.cf
 rm -f "${cfgExportFile}"
 orderId="$(/opt/icewarp/tool.sh get system C_License | egrep -o "<header><purchaseid>(.*)</purchaseid>" | sed -r 's|<header><purchaseid>(.*)</purchaseid>|\1|')"
