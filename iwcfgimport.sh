@@ -3,9 +3,9 @@ function setval()
 {
 prop="${1}";
 val="${2}";
-echo -n "${prop} = ${val} .. ";
-/opt/icewarp/tool.sh set system ${prop} "${val}"
-return $?
+/opt/icewarp/tool.sh set system ${prop} "${val}" > /dev/null 2>&1
+ret=$?
+echo "${ret} - ${prop} : ${val}";
 }
 
 for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath tempPath logsPath accDbConn dcDbConn gwDbConn asDbConn easDbConn easDbUser easDbPass;
