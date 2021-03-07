@@ -547,9 +547,9 @@ function wccheck() # ( -> OK, FAIL; time spent in ms )
 {
 local iwserver="${HOST}"
 local start=`date +%s%N | cut -b1-13`
-local email="$(readcfg 'wctestemail')";
+local email="$(readcfg 'wctestemail' | tail -1)";
 local admemail="globaladmin";
-local admpass="$(readcfg 'globaladm')";
+local admpass="$(readcfg 'globaladm' | tail -1)";
 # get admin auth token
 local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admemail}</email><password>${admpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
 local wcatoken="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
