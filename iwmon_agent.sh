@@ -128,6 +128,7 @@ timeout -k 3 3 ${toolSh} set system C_Accounts_Policies_Pass_DenyExport 1 > /dev
 writecfg "EASUser" "${USER}"
 writecfg "EASPass" "${PASS}"
 writecfg "EASVers" "${aVER}"
+writecfg "wctestemail" "$(/opt/icewarp/tool.sh export account "*@*" u_type | grep ",0" | sed -r 's|,0,||' | head -1)"
 echo "Select and configure test account email for webclient monitoring."
 echo "Example config for account webtest@testdomain.local:"
 echo
