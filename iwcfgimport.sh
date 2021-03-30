@@ -47,4 +47,5 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath tempP
   done
 mv -v "/opt/icewarp/config/_webmail/server.xml" "/opt/icewarp/config/_webmail/server.xml_bak_iwcfgimport_$(date '+%s')"
 cp -fv "${cfgImportFile}.web" /opt/icewarp/config/_webmail/server.xml
+chown icewarp:icewarp /opt/icewarp/config/_webmail/server.xml
 exit 0
