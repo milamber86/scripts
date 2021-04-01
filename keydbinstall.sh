@@ -14,7 +14,7 @@ yum -y install vim rsync
 rpm --import https://download.keydb.dev/packages/rpm/RPM-GPG-KEY-keydb
 yum -y install https://download.keydb.dev/packages/rpm/centos7/x86_64/keydb-latest-1.el7.x86_64.rpm
 cp -v /etc/keydb/keydb.conf /etc/keydb/keydb.conf_bak
-cat > /etc/keydb/keydb.conf << 'EOL'
+cat > /etc/keydb/keydb.conf << EOL
 bind 0.0.0.0
 port 6379
 requirepass ${keydbPass}
@@ -43,7 +43,7 @@ cd /usr/src/${LATEST_HAPROXY}
 make TARGET=linux-glibc USE_PCRE=1 USE_OPENSSL=1 USE_ZLIB=1 USE_CRYPT_H=1 USE_LIBCRYPT=1 USE_SYSTEMD=1
 mkdir /etc/haproxy
 make install
-cat > /usr/lib/systemd/system/haproxy.service << 'EOL'
+cat > /usr/lib/systemd/system/haproxy.service << EOL
 [Unit]
 Description=HAProxy Load Balancer
 After=syslog.target network.target
@@ -63,7 +63,7 @@ Type=notify
 WantedBy=multi-user.target
 EOL
 
-cat > /etc/haproxy/haproxy.cfg << 'EOL'
+cat > /etc/haproxy/haproxy.cfg << EOL
 global
 user haproxy
 group haproxy
@@ -100,7 +100,7 @@ systemctl status haproxy
 ### keepalived
 yum -y install keepalived
 mv -v /etc/keepalived/keepalived.conf /etc/keepalived/keepalived.conf_bak
-cat > /etc/keepalived/keepalived.conf << 'EOL'
+cat > /etc/keepalived/keepalived.conf << EOL
 vrrp_instance VIP_1 {
     state MASTER
     interface ${VIPifname}
