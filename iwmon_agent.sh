@@ -625,7 +625,7 @@ local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"${email}\" type=\"s
 local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"INBOX\"")"
 if [[ "${response}" =~ "INBOX" ]];
   then
-   local freturn=OK;slog "INFO" "Webclient check OK.";
+   local freturn=OK;
   else
    local freturn=FAIL;slog "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
 fi
@@ -636,7 +636,7 @@ local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 echo "${freturn}" > ${outputpath}/wcstatus.mon;
 echo "${runtime}" > ${outputpath}/wcruntime.mon;
-if [[ "${freturn}" == "OK" ]]; then return 0;else return 1;fi
+if [[ "${freturn}" == "OK" ]]; then return 0;slog "INFO" "Webclient check OK. Login time: ${runtime}.";else return 1;fi
 }
 
 # nfs storage write speed healthcheck
