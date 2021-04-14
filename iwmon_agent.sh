@@ -636,7 +636,7 @@ local end=`date +%s%N | cut -b1-13`
 local runtime=$((end-start))
 echo "${freturn}" > ${outputpath}/wcstatus.mon;
 echo "${runtime}" > ${outputpath}/wcruntime.mon;
-if [[ "${freturn}" == "OK" ]]; then return 0;slog "INFO" "Webclient check OK. Login time: ${runtime}.";else return 1;fi
+if [[ "${freturn}" == "OK" ]]; then slog "INFO" "Webclient check OK. Login time: ${runtime}.";return 0;else return 1;fi
 }
 
 # nfs storage write speed healthcheck
