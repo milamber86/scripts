@@ -45,5 +45,8 @@ if [ -z "${wclogin}" ];
 fi
 }
 #MAIN
+if [[ -z $@ ]];
+  then
+  echo "Requires user email as a mandatory 1st parameter. 2nd param: globaladminpass, 3rd param: server host/IP are optional."
 wctoken "${@}"
 exit 0
