@@ -48,5 +48,7 @@ fi
 if [[ -z $@ ]];
   then
   echo "Requires user email as a mandatory 1st parameter. 2nd param: globaladminpass, 3rd param: server host/IP are optional."
+  exit 1
+fi
 wctoken "${@}"
 exit 0
