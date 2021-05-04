@@ -13,7 +13,7 @@ Line #12: LicenseFile license.key                                               
 Line #13: IncomingPath ....\merak\mail\_incoming\                                         //Full path to the mail incoming directory 
 Line #14: SlaveServer "0" / "1"                                                           //Specifies if the server has a role of slave. 
 Line #15: MasterHost 192.168.0.2"                                                         //Specifies the master host. 
-Line #16: SlaveHosts 192.168.0.3,192.168.0.4                                              //Specifies the list of slave hosts. 
+Line #16: SlaveHosts 192.168.0.3;192.168.0.4                                              //Specifies the list of slave hosts. 
 
 
 
@@ -21,7 +21,7 @@ Line #16: SlaveHosts 192.168.0.3,192.168.0.4                                    
 /mnt/data/config/
 
 
-01
+11
 
 
 
@@ -33,7 +33,7 @@ Line #16: SlaveHosts 192.168.0.3,192.168.0.4                                    
 /opt/icewarp/mailqueues/_incoming/
 0
 192.168.0.2
-192.168.0.3,192.168.0.4,192.168.0.5
+192.168.0.3;192.168.0.4;192.168.0.5
 -- end example linux
 
 
