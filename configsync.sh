@@ -4,8 +4,8 @@ script_backupdir="/root/configsync_backup";mkdir -p ${script_backupdir};
 script_logdir="/root";
 logfile_name="$(date --iso-8601=seconds)_configsync.log";
 config_maindir="/mnt/config";
-source_host_IP="172.16.4.191";
-target_host_IP="172.16.5.191";
+source_host_IP="${1}";
+target_host_IP="${2}";
 
 #func
 log() {
@@ -63,13 +63,14 @@ sed -i -r s'|172\.16\.4\.|172.16.5.|g' /opt/icewarp/path.dat
 sed -i -r s'|172\.16\.4\.|172.16.5.|g' /opt/icewarp/php/php.ini
 /root/iwcfgimport.sh
 /usr/bin/cp -fv /opt/icewarp/path.dat /root/path.dat.tpl
+/usr/bin/cp -fv /opt/icewarp/php/php.ini /root/php.ini.tpl
 CNT=11
 for I in $(getSlaveNodes); do
     ((CNT=CNT+1))
     sed -i "4s|.*|$CNT|" /root/path.dat.tpl
     sed -i "14s|0|1|" /root/path.dat.tpl
     scp /root/path.dat.tpl root@${I}:/opt/icewarp/path.dat
-    scp /opt/icewarp/php/php.ini root@${I}:/opt/icewarp/php/php.ini
+    scp /root/php.ini.tpl root@${I}:/opt/icewarp/php/php.ini
     scp /opt/icewarp/license01.key root@${I}:/opt/icewarp/license01.key
   done
 fi;fi;
@@ -78,6 +79,8 @@ fi;fi;
 zabbixConf() {
 rsync -a --no-checksum root@${source_host_IP}:/etc/zabbix/ /etc/zabbix/
 sed -i -r s'|172\.16\.4\.|172.16.5.|g' /etc/zabbix/zabbix_agentd.conf
+service zabbix-agent restart
+service zabbix-agent status
 }
 
 #main
@@ -86,15 +89,6 @@ backupConfig
 prepareConfig
 zabbixConf
 exit 0
-
-#alg
-#- rsync <configpath>
-#- rsync /opt/icewarp/path.dat, sed ???teamchatapi!!!
-#- export config on target
-#- sed config export on target and import back, update webdoc IP in IW API ( /opt/icewarp/tool.sh get system C_WebDocuments_Connection )
-#- sed redis IP in php.ini
-#- rsync /etc/zabbix/, sed zabbix_agentd.conf
-#- ( fstab check on target? )
 
 #todo
 #- teamchatapi IPS?
