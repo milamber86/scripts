@@ -1,10 +1,19 @@
 #!/bin/bash
 cfgImportFile=/root/cfgexport.cf
+iw_install_dir=$(cat /etc/icewarp/icewarp.conf | awk -F "\"" '/^IWS_INSTALL_DIR=/ {print $2}')
+test="$(head -1 $iw_install_dir/path.dat)";
+if [[ ! -z "${test}" ]]
+  then
+    config_path="$(echo -n ${test} | tr -d '\r')";
+  else
+    config_path="$iw_install_dir/config";
+fi
+
 function setval()
 {
 prop="${1}";
 val="${2}";
-/opt/icewarp/tool.sh set system ${prop} "${val}" > /dev/null 2>&1
+"$iw_install_dir/tool.sh" set system ${prop} "${val}" > /dev/null 2>&1
 ret=$?
 echo "${ret} - ${prop} : ${val}";
 }
@@ -45,7 +54,7 @@ for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath tempP
       ;;
     esac
   done
-mv -v "/opt/icewarp/config/_webmail/server.xml" "/opt/icewarp/config/_webmail/server.xml_bak_iwcfgimport_$(date '+%s')"
-cp -fv "${cfgImportFile}.web" /opt/icewarp/config/_webmail/server.xml
-chown icewarp:icewarp /opt/icewarp/config/_webmail/server.xml
+mv -v "$config_path/_webmail/server.xml" "$config_path/_webmail/server.xml_bak_iwcfgimport_$(date '+%s')"
+cp -fv "${cfgImportFile}.web" "$config_path/_webmail/server.xml"
+chown icewarp:icewarp "$config_path/_webmail/server.xml"
 exit 0
