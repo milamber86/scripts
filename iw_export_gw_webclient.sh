@@ -1,4 +1,5 @@
 #!/bin/bash
+# requires: jq, yajl ( yum -y install jq yajl )
 iwserver="127.0.0.1";                             # IceWarp server IP/host
 ctimeout="600";                                   # curl connection timeout in seconds
 tmpFile="/root/tmpFile";
