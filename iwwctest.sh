@@ -101,17 +101,17 @@ if [[ "${response}" =~ "INBOX" ]];
    local freturn=FAIL;echo "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
    return 1;
 fi
-for FOLDER in $(getImapFolders "${email}" | grep -v Completed);
-  do
-  local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"${FOLDER}\"")"
-  if [[ "${response}" =~ "${FOLDER}" ]];
-  then
-   local freturn=OK;echo -n "OK - ${FOLDER};";
-  else
-   local freturn=FAIL;echo "ERROR" "Webclient Stage 6 fail - ${FOLDER}";
+#for FOLDER in $(getImapFolders "${email}" | grep -v Completed);
+#  do
+#  local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"${FOLDER}\"")"
+#  if [[ "${response}" =~ "${FOLDER}" ]];
+#  then
+#   local freturn=OK;echo -n "OK - ${FOLDER};";
+#  else
+#   local freturn=FAIL;echo "ERROR" "Webclient Stage 6 fail - ${FOLDER}";
    #return 1;
-fi
-done
+#fi
+#done
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
