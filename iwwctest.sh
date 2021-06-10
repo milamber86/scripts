@@ -36,7 +36,7 @@ fi
 # impersonate webclient user
 local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
 local wclogintmp="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
-wclogin="${wclogintmp}"
+wclogin="$(echo ${wclogintmp} | awk -F'=' '{print $2}')";
 if [ -z "${wclogin}" ];
   then
   local freturn="FAIL";echo "FAIL"
@@ -65,7 +65,7 @@ function wclogin() # ( wctoken -> user webclient login )
 local email="${2}";
 local iwserver="127.0.0.1";
 # get user phpsessid
-local wcphpsessid="$(curl -s --connect-timeout 8 -m 8 -ikL "https://127.0.0.1/webmail/${1}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+local wcphpsessid="$(curl -s --connect-timeout 8 -m 8 -ikL "https://127.0.0.1/webmail/?atoken=${1}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 if [ -z "${wcphpsessid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
