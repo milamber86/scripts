@@ -6,8 +6,8 @@ scriptdir="$(cd $(dirname $0) && pwd)"
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 excludePattern="Public";
-admin="tester12@test1.loc";
-adminpass="awg3545ser6t3h45esg";
+admin="adm@service.local";
+adminpass="admpass";
 
 function wctoken() # ( user@email -> auth wc URL for the user )
 {
@@ -101,21 +101,23 @@ if [[ "${response}" =~ "INBOX" ]];
    local freturn=FAIL;echo "ERROR" "Webclient Stage 6 fail - No INBOX in folder sync response";
    return 1;
 fi
-#for FOLDER in $(getImapFolders "${email}" | grep -v Completed);
-#  do
-#  local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o "folder uid=\"${FOLDER}\"")"
-#  if [[ "${response}" =~ "${FOLDER}" ]];
-#  then
-#   local freturn=OK;echo -n "OK - ${FOLDER};";
-#  else
-#   local freturn=FAIL;echo "ERROR" "Webclient Stage 6 fail - ${FOLDER}";
+# refresh all mail folders contents
+for FOLDER in $(getImapFolders "${email}" | grep -v Completed);
+  do
+  local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"1118981116965233101623396990027\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${FOLDER}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><static_flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>42</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
+  local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
+  if [[ "${response}" =~ "ATTRIBUTES" ]];
+  then
+   local freturn=OK;echo -n "${FOLDER}:OK;";
+  else
+   local freturn=FAIL;echo -n "${FOLDER}:ERROR;";
    #return 1;
-#fi
-#done
+fi
+done
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
-echo "OK - INBOX"
+echo "OK"
 return 0
 }
 
