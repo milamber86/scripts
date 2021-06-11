@@ -78,7 +78,7 @@ local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-
 if [ -z "${wcsid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
-  echo "ERROR" "Webclient Stage 4 fail - Error logging to the webclient ( check PHP session store is available if Redis/KeyDB used )";
+  echo "ERROR" "Webclient Stage 4 fail - Error logging to the webclient ( check PHP session store is available if Redis/KeyDB used and user is not disabled )";
   return 1;
 fi
 # get settings
@@ -117,16 +117,16 @@ local tmpFolder="$(echo "${FOLDER}" | sed -r 's# #|#g')";
   local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
   if [[ "${response}" =~ "ATTRIBUTES" ]];
   then
-   local freturn=OK;echo -n "${folderName}:OK;";
+   local freturn=OK;echo -n "|${folderName}| - OK;";
   else
-   local freturn=FAIL;echo -n "${folderName}:ERROR;";
+   local freturn=FAIL;echo -n "|${folderName}| - ERROR;";
    #return 1;
 fi
 done
 # session logout
 local logout_request="<iq sid=\"wm-"${wcsid}"\" type=\"set\"><query xmlns=\"webmail:iq:auth\"/></iq>"
 curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${logout_request}" "https://${iwserver}/webmail/server/webmail.php" > /dev/null 2>&1
-echo "OK"
+echo "WC Logout - OK"
 return 0
 }
 
