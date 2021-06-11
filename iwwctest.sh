@@ -6,8 +6,8 @@ scriptdir="$(cd $(dirname $0) && pwd)"
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 excludePattern="Public";
-admin="beranek@icewarp.cz";
-adminpass="r3r4-g6Est*46g4R6waeg";
+admin="adm";
+adminpass="admpass";
 
 function wctoken() # ( user@email -> auth wc URL for the user )
 {
