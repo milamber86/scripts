@@ -1,13 +1,13 @@
 #!/bin/bash
 #VARS
 HOST="127.0.0.1";
-ctimeout=15;
+ctimeout=60;
 scriptdir="$(cd $(dirname $0) && pwd)"
 toolSh="/opt/icewarp/tool.sh";
 icewarpdSh="/opt/icewarp/icewarpd.sh";
 excludePattern="Public";
-admin="adm@service.local";
-adminpass="admpass";
+admin="beranek@icewarp.cz";
+adminpass="r3r4-g6Est*46g4R6waeg";
 
 function wctoken() # ( user@email -> auth wc URL for the user )
 {
@@ -35,7 +35,7 @@ if [ -z "${wcatoken}" ];
 fi
 # impersonate webclient user
 local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
-local wclogintmp="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
+local wclogintmp="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
 wclogin="$(echo ${wclogintmp} | awk -F'=' '{print $2}')";
 if [ -z "${wclogin}" ];
   then
@@ -65,7 +65,7 @@ function wclogin() # ( wctoken -> user webclient login )
 local email="${2}";
 local iwserver="127.0.0.1";
 # get user phpsessid
-local wcphpsessid="$(curl -s --connect-timeout 8 -m 8 -ikL "https://127.0.0.1/webmail/?atoken=${1}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://127.0.0.1/webmail/?atoken=${1}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 if [ -z "${wcphpsessid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -74,7 +74,7 @@ if [ -z "${wcphpsessid}" ];
 fi
 # auth user webclient session
 local auth_request="<iq type=\"set\"><query xmlns=\"webmail:iq:auth\"><session>wm"${wcphpsessid}"</session></query></iq>"
-local wcsid="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
+local wcsid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${auth_request}" "https://${iwserver}/webmail/server/webmail.php" | egrep -o 'iq sid="(.*)" type=' | sed -r s'|iq sid="wm-(.*)" type=|\1|')";
 if [ -z "${wcsid}" ];
   then
   local freturn="FAIL";echo "FAIL" > ${outputpath}/wcstatus.mon;echo "99999" > ${outputpath}/wcruntime.mon;
@@ -102,15 +102,24 @@ if [[ "${response}" =~ "INBOX" ]];
    return 1;
 fi
 # refresh all mail folders contents
-for FOLDER in $(getImapFolders "${email}" | grep -v Completed);
-  do
-  local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"1118981116965233101623396990027\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${FOLDER}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><static_flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>42</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
+cmdResult=$(getImapFolders "${email}" | grep -v Completed); # get imap folder list
+if [[ ${?} -ne 0 ]] ; then
+  echo "${cmdResult}";exit 1;
+    else
+  readarray -t imapFolders < <(echo "${cmdResult}")
+fi
+for FOLDER in "${imapFolders[@]}" # loop through folders in folder list and perform folder refresh
+do
+local tmpFolder="$(echo "${FOLDER}" | sed -r 's# #|#g')";
+  local folderEncName="$(echo "${tmpFolder}" | sed -r 's|"||g')";
+  local folderName="$(python imapcode.py "$(echo "${folderEncName}" | sed -r s'#\|# #g')")";
+  local refreshfolder_request="<iq sid=\"wm-"${wcsid}"\" uid=\"1118981116965233101623396990027\" type=\"get\" format=\"json\"><query xmlns=\"webmail:iq:items\"><account uid=\"${email}\"><folder uid=\"${folderName}\"><item><values><subject/><to/><sms/><from/><date/><size/><flags/><static_flags/><has_attachment/><color/><priority/><smime_status/><item_moved/><tags/><ctz>120</ctz></values><filter><limit>42</limit><offset>0</offset><sort><date>desc</date><item_id>desc</item_id></sort></filter></item></folder></account></query></iq>"
   local response="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${refreshfolder_request}" "https://${iwserver}/webmail/server/webmail.php")"
   if [[ "${response}" =~ "ATTRIBUTES" ]];
   then
-   local freturn=OK;echo -n "${FOLDER}:OK;";
+   local freturn=OK;echo -n "${folderName}:OK;";
   else
-   local freturn=FAIL;echo -n "${FOLDER}:ERROR;";
+   local freturn=FAIL;echo -n "${folderName}:ERROR;";
    #return 1;
 fi
 done
@@ -122,6 +131,7 @@ return 0
 }
 
 #MAIN
+if [[ ! -f imapcode.py ]]; then yum -y install python python-six; rm -fv imapcode.py; wget https://raw.githubusercontent.com/milamber86/scripts/master/imapcode.py; fi
 if [[ -z $@ ]];
   then
   echo "Requires user email as a mandatory 1st parameter. 2nd param: globaladminpass, 3rd param: server host/IP are optional."
