@@ -5,7 +5,7 @@
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
-# UserParameter=icewarp.iwbackup,/opt/icewarp/scripts/iwmon.sh "iwver";cat /opt/icewarp/var/iwbackupstatus.mon
+# UserParameter=icewarp.iwbackup,/opt/icewarp/scripts/iwmon.sh "iwbackup";cat /opt/icewarp/var/iwbackupstatus.mon
 # UserParameter=icewarp.iwver,/opt/icewarp/scripts/iwmon.sh "iwver";cat /opt/icewarp/var/iwverstatus.mon
 # UserParameter=icewarp.cfg,/opt/icewarp/scripts/iwmon.sh "cfg";cat /opt/icewarp/var/cfgstatus.mon
 # UserParameter=icewarp.nfs,/opt/icewarp/scripts/iwmon.sh "nfs";cat /opt/icewarp/var/nfsmntstatus.mon
