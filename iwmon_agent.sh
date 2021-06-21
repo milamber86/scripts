@@ -507,10 +507,9 @@ fi
 function xmppstat()
 {
 local ismaster=$(head -14 /opt/icewarp/path.dat 2>/dev/null | tail -1);
-local TEST_XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 5222)"
 if [[ ${ismaster} -ne 1 ]]
   then
-    XMPP_RESPONSE="$(echo ${TEST_XMPP_RESPONSE} | egrep -o "^<stream:stream xmlns" | egrep -o "xmlns")";
+    local XMPP_RESPONSE="$(echo '<?xml version="1.0"?>  <stream:stream to="healthcheck" xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" version="1.0">' | timeout -k ${ctimeout} ${ctimeout} nc -w 3 "${HOST}" 5222 | egrep -o "^<stream:stream xmlns" | egrep -o "xmlns")"
     if [[ "${XMPP_RESPONSE}" == "xmlns" ]]
       then
         echo "OK" > ${outputpath}/xmppstatus.mon;slog "INFO" "IceWarp master XMPP OK.";
