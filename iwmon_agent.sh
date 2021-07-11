@@ -341,7 +341,7 @@ http) local conn_web_count="$(iwsnmpget "8.7")";
               then
               echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
               else
-              echo "99999" > ${outputpath}/connstat_web.mon;
+              echo "99999" > ${outputpath}/connstat_http.mon;
       fi
 ;;
 msgout) local smtp_msg_out="$(iwsnmpget "16.1")";
