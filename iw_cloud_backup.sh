@@ -2,7 +2,7 @@
 # ver. 20210108_01
 source /etc/icewarp/icewarp.conf
 if testconfigpath="$(head -1 /opt/icewarp/path.dat 2>/dev/null)"; then iwconfigpath="$(echo ${testconfigpath} | tr -d '\r')"; else iwconfigpath="${IWS_INSTALL_DIR}/config"; fi
-if [[ -z "${iwconfigpath}" ]]; then iwconfigpath="/opt/icewarp/config/"
+if [[ -z "${iwconfigpath}" ]]; then iwconfigpath="/opt/icewarp/config/"; fi
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
 scriptdir="$(cd $(dirname $0) && pwd)"
