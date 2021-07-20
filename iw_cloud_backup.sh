@@ -2,6 +2,7 @@
 # ver. 20210108_01
 source /etc/icewarp/icewarp.conf
 if testconfigpath="$(head -1 /opt/icewarp/path.dat 2>/dev/null)"; then iwconfigpath="$(echo ${testconfigpath} | tr -d '\r')"; else iwconfigpath="${IWS_INSTALL_DIR}/config"; fi
+if [[ -z "${iwconfigpath}" ]]; then iwconfigpath="/opt/icewarp/config/"
 maildirpath="$(${IWS_INSTALL_DIR}/tool.sh get system C_System_Storage_Dir_MailPath | grep -P '(?<=: ).*(?=/mail/)' -o)"
 backuppath="${maildirpath}/backup"
 scriptdir="$(cd $(dirname $0) && pwd)"
@@ -182,9 +183,9 @@ for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbck
         fi
       else
         sizeK=$(du -k ${ref} | awk '{print $1}');
-        if [[ ${sizeK} -le 1 ]]
+        if [[ ${sizeK} -le 10 ]]
           then
-            log "Backup file ${I} size lower than 1M ( ${sizeK}KB ), fail."; die_error;
+            log "Backup file ${I} size lower than 10K ( ${sizeK}KB ), fail."; die_error;
           else
             log "Backup file ${I} size ${sizeK}KB, OK"
         fi
