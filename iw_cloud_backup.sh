@@ -15,7 +15,7 @@ backupsrvport="${2}" # than the one in IW connection strings
 cloudplan=$(${IWS_INSTALL_DIR}/tool.sh get system c_license_xml | grep -P '(?<=<licensetype>).*(?=</licensetype>)' -o -m 1)
 logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
-retention_days=3;
+retention_days=30;
 retention_log_days=30;
 
 
