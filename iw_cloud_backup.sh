@@ -183,7 +183,7 @@ for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbck
         fi
       else
         sizeK=$(du -k ${ref} | awk '{print $1}');
-        if [[ ${sizeK} -le 10 ]]
+        if [[ ${sizeK} -le 5 ]]
           then
             log "Backup file ${I} size lower than 10K ( ${sizeK}KB ), fail."; die_error;
           else
