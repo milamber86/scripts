@@ -1,5 +1,5 @@
 #!/bin/bash
-# ver. 20210108_01
+# ver. 20210826_01
 source /etc/icewarp/icewarp.conf
 if testconfigpath="$(head -1 /opt/icewarp/path.dat 2>/dev/null)"; then iwconfigpath="$(echo ${testconfigpath} | tr -d '\r')"; else iwconfigpath="${IWS_INSTALL_DIR}/config"; fi
 if [[ -z "${iwconfigpath}" ]]; then iwconfigpath="/opt/icewarp/config/"; fi
