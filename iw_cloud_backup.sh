@@ -1,5 +1,5 @@
 #!/bin/bash
-# ver. 20210826_01
+# ver. 20210826_02
 source /etc/icewarp/icewarp.conf
 if testconfigpath="$(head -1 /opt/icewarp/path.dat 2>/dev/null)"; then iwconfigpath="$(echo ${testconfigpath} | tr -d '\r')"; else iwconfigpath="${IWS_INSTALL_DIR}/config"; fi
 if [[ -z "${iwconfigpath}" ]]; then iwconfigpath="/opt/icewarp/config/"; fi
@@ -183,9 +183,9 @@ for I in accdbbckfile aspdbbckfile grwdbbckfile dcdbbckfile easdbbckfile wcdbbck
         fi
       else
         sizeK=$(du -k ${ref} | awk '{print $1}');
-        if [[ ${sizeK} -le 5 ]]
+        if [[ ${sizeK} -lt 3 ]]
           then
-            log "Backup file ${I} size lower than 5K ( ${sizeK}KB ), fail."; die_error;
+            log "Backup file ${I} size lower than 3K ( ${sizeK}KB ), fail."; die_error;
           else
             log "Backup file ${I} size ${sizeK}KB, OK"
         fi
