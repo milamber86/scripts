@@ -1,7 +1,7 @@
 #!/bin/bash
 # iwmon_agent.sh
 # IceWarp monitoring for Zabbix
-# ver. 20210215_001
+# ver. 20210915_001
 #
 # zabbix agent config example ( place in /etc/zabbix/zabbix_agentd.d/userparameter_icewarp.conf ):
 #
@@ -27,6 +27,7 @@
 # UserParameter=icewarp.connimap,/opt/icewarp/scripts/iwmon.sh "connstat" "imap";cat /opt/icewarp/var/connstat_imap.mon
 # UserParameter=icewarp.connxmpp,/opt/icewarp/scripts/iwmon.sh "connstat" "xmpp";cat /opt/icewarp/var/connstat_xmpp.mon
 # UserParameter=icewarp.connhttp,/opt/icewarp/scripts/iwmon.sh "connstat" "http";cat /opt/icewarp/var/connstat_http.mon
+# UserParameter=icewarp.queuetmp,/opt/icewarp/scripts/iwmon.sh "queuestat" "tmp";cat /opt/icewarp/var/queuestat_tmp.mon
 # UserParameter=icewarp.queueinc,/opt/icewarp/scripts/iwmon.sh "queuestat" "inc";cat /opt/icewarp/var/queuestat_inc.mon
 # UserParameter=icewarp.queueoutg,/opt/icewarp/scripts/iwmon.sh "queuestat" "outg";cat /opt/icewarp/var/queuestat_outg.mon
 # UserParameter=icewarp.queueretr,/opt/icewarp/scripts/iwmon.sh "queuestat" "retr";cat /opt/icewarp/var/queuestat_retr.mon
@@ -109,8 +110,10 @@ if [ -f "${FILE}" ]
   local mail_outpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_outgoing/|');
   local mail_inpath=$(timeout -k ${ctimeout} ${ctimeout} ${toolSh} get system C_System_Storage_Dir_MailPath | sed -r 's|^.*:\s(.*)|\1_incoming/|');
 fi
+local mail_tmppath=$(${toolSh} get system C_System_Storage_Dir_TempPath | awk '{print $2}')
 writecfg "mail_outpath" "${mail_outpath}";
 writecfg "mail_inpath" "${mail_inpath}";
+writecfg "mail_tmppath" "${mail_tmppath}";
 ${toolSh} set system C_Accounts_Policies_EnableGlobalAdmin 1
 local super="$(timeout -k 30 30 ${toolSh} get system C_Accounts_Policies_SuperUserPassword | awk '{print $2}')";
 writecfg "super" "${super}";
@@ -443,6 +446,7 @@ function queuestat() # ( queue name in outg, inc, retr -> number of messages )
 {
 local mail_outpath=$(readcfg "mail_outpath");
 local mail_inpath=$(readcfg "mail_inpath");
+local mail_tmppath=$(readcfg "mail_tmppath");
 case "${1}" in
 outg) local queue_outgoing_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_outpath} -maxdepth 1 -type f | wc -l);
       if [[ ${?} -eq 0 ]]; then
@@ -463,6 +467,13 @@ retr) local queue_outgoing_retry_count=$(timeout -k ${ctimeout} ${ctimeout} find
                            echo "${queue_outgoing_retry_count}" > ${outputpath}/queuestat_retr.mon;
                            else
                            echo "9999" > ${outputpath}/queuestat_retr.mon;
+      fi
+;;
+tmp) local queue_tmp_count=$(timeout -k ${ctimeout} ${ctimeout} find ${mail_tmppath}SMTP/ -type f | wc -l);
+      if [[ ${?} -eq 0 ]]; then
+                           echo "${queue_tmp_count}" > ${outputpath}/queuestat_tmp.mon;
+                           else
+                           echo "9999" > ${outputpath}/queuestat_tmp.mon;
       fi
 ;;
 *)    echo "Invalid argument. Use IceWarp queue name: outg, inc, retr"
@@ -734,7 +745,7 @@ for CONNCHECK in smtp imap xmpp http
     cat "${outputpath}/connstat_${CONNCHECK}.mon"
 done
 echo "--- SMTP queues number of messages:"
-for QUEUECHECK in inc outg retr
+for QUEUECHECK in inc outg retr tmp
     do
     echo -n "$(stat -c'%y' "${outputpath}/queuestat_${QUEUECHECK}.mon") - "
     echo -n "${QUEUECHECK}: "
@@ -781,7 +792,7 @@ Synopsis
     supported services: smtp, imap, xmpp, grw, http
 
     iwmon.sh queuestat [ smtp_queue_name ]
-    available queues: inc ( incoming ), outg ( outgoing ), retr ( outgoing-retry )
+    available queues: inc ( incoming ), outg ( outgoing ), retr ( outgoing-retry ), tmp ( smtp temp dir )
 
     iwmon.sh connstat [ smtp_msg_stat_name ]
     available smtp stats: msgout, msgin, msgfail, msgfaildata, msgfailvirus, msgfailcf, msgfailextcf, msgfailrule
@@ -837,14 +848,14 @@ all) if [[ "${2}" == "verbose" ]]
         then
         smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck;eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
-        for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
+        for QUEUENAME in inc outg retr tmp; do queuestat "${QUEUENAME}";done;
         printStats;
      fi
      if [[ "${2}" == "silent" ]]
         then
         smtpstat;imapstat;xmppstat;grwstat;wcstat;wccheck;eascheck;nfsmntstat;nfsreadspeed;nfswritespeed;cfgstat;iwvercheck;iwbackupcheck;
         for STATNAME in smtp imap xmpp grw http msgout msgin msgfail msgfaildata msgfailvirus msgfailcf msgfailextcf msgfailrule msgfaildnsbl msgfailips msgfailspam; do connstat "${STATNAME}";done;
-        for QUEUENAME in inc outg retr; do queuestat "${QUEUENAME}";done;
+        for QUEUENAME in inc outg retr tmp; do queuestat "${QUEUENAME}";done;
      fi
      if [[ "${2}" != "verbose" ]]
         then
