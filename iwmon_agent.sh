@@ -280,7 +280,7 @@ local todo=1
 function iwsnmpget() # ( iw snmp SvcID.SVC -> snmp response value )
 {
 local test="$(snmpget -r 1 -t 1 -v 1 -c private ${HOST}:${SNMPPORT} "1.3.6.1.4.1.23736.1.2.1.1.2.${1}")"
-      if [[ ${?} != 0 ]]
+      if [[ ${?} -eq 0 ]]
         then
           echo "Fail";
           return 1;
@@ -344,7 +344,7 @@ http) local conn_web_count="$(iwsnmpget "8.7")";
               then
               echo "${conn_web_count}" > ${outputpath}/connstat_http.mon;
               else
-              echo "99999" > ${outputpath}/connstat_web.mon;
+              echo "99999" > ${outputpath}/connstat_http.mon;
       fi
 ;;
 msgout) local smtp_msg_out="$(iwsnmpget "16.1")";
