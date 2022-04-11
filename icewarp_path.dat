@@ -14,7 +14,7 @@ Line #13: IncomingPath ....\merak\mail\_incoming\                               
 Line #14: SlaveServer "0" / "1"                                                           //Specifies if the server has a role of slave. 
 Line #15: MasterHost 192.168.0.2"                                                         //Specifies the master host. 
 Line #16: SlaveHosts 192.168.0.3;192.168.0.4                                              //Specifies the list of slave hosts. 
-Line #17: TeamChatAPI URL https://192.168.0.2/teamchatapi/                                //URL TeamChatAPI listens on the node
+Line #17: TeamChatAPI URL https://185.30.21.21:55991/teamchatapi/                         //Publicly available URL/IP:port TeamChatAPI (https) listens on the LB and is forwarded to this node 
 
 
 -- example linux master node ID 01
@@ -34,7 +34,7 @@ Line #17: TeamChatAPI URL https://192.168.0.2/teamchatapi/                      
 0
 192.168.0.2
 192.168.0.3;192.168.0.4;192.168.0.5
-https://192.168.0.2/teamchatapi/
+https://185.30.21.21:55991/teamchatapi/
 -- end example linux
 
 
