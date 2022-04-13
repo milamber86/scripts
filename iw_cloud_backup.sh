@@ -17,7 +17,7 @@ logdate="$(date +%Y%m%d)"
 logfile="${scriptdir}/logs/bck_${logdate}.log"
 retention_days=30;
 retention_log_days=30;
-
+extraMysqlOpts="--no-tablespaces --single-transaction";
 
 function log()
 {
@@ -153,12 +153,12 @@ accbckfile="${backuppath}/bck_acc_backup`date +%Y%m%d-%H%M`.csv";
 dombckfile="${backuppath}/bck_dom_backup`date +%Y%m%d-%H%M`.csv";
 
 log "Starting DB backup."
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile}
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile}
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile}
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile}
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile}
-/usr/bin/mysqldump --single-transaction -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${accdbname} | gzip -c | cat > ${accdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${aspdbname} | gzip -c | cat > ${aspdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${grwdbname} | gzip -c | cat > ${grwdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${dcdbname} | gzip -c | cat > ${dcdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${easdbname} | gzip -c | cat > ${easdbbckfile}
+/usr/bin/mysqldump ${extraMysqlOpts} -u ${dbuser} -p${dbpass} -h${dbhost} -P ${dbport} ${wcdbname} | gzip -c | cat > ${wcdbbckfile}
 log "Finished DB backup."
 log "Starting IW config backup."
 /usr/bin/tar -czf ${cnfbckfile} ${IWS_INSTALL_DIR}/config > /dev/null 2>&1
