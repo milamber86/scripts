@@ -19,11 +19,11 @@ if [[ ( "${SlaveIO}" = "Yes" && "${SlaveSQL}" = "Yes" && "${SlaveBehind}" -le 30
 # if slave ok, take local backup and reset alert on monitoring
 	then
 	  zabbix_sender -z ${monitoring} -s "$(hostname)" -k SlaveLagAlert -o 0 > /dev/null 2>&1
-	  innobackupex --no-lock --user=${dbuser} --password=${dbpass} --stream=tar /tmp/ | gzip -c | cat > ${backuppath}/bck_mysql`date +%Y%m%d-%H%M`.tar.gz 2> ${TMPFILE}
+	  innobackupex --no-lock --user=${dbuser} --password=${dbpass} --stream=tar /tmp/ 2> ${TMPFILE} | gzip -c | cat > ${backuppath}/bck_mysql`date +%Y%m%d-%H%M`.tar.gz
 # if slave Nok, take backup from the master and raise alert on monitoring
 	else
 	  zabbix_sender -z ${monitoring} -s "$(hostname)" -k SlaveLagAlert -o 1 > /dev/null 2>&1
-	  ssh root@${MasterIP} "innobackupex --no-lock --user=${dbuser} --password=${dbpass} --stream=tar /tmp/ | gzip -c | cat" > ${backuppath}/bck_mysql`date +%Y%m%d-%H%M`.tar.gz 2> ${TMPFILE}
+	  ssh root@${MasterIP} "innobackupex --no-lock --user=${dbuser} --password=${dbpass} --stream=tar /tmp/ 2> ${TMPFILE} | gzip -c | cat" > ${backuppath}/bck_mysql`date +%Y%m%d-%H%M`.tar.gz
 fi
 # send backup result to monitoring
 	  result="$(grep -o " completed OK" ${TMPFILE})";
