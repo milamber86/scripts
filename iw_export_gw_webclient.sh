@@ -1,11 +1,13 @@
 #!/bin/bash
-# requires: jq, yajl ( yum -y install jq yajl )
+# !!! requires DB credentials in user's home folder in .my.cnf for passwordless mysql access !!!
+# no longer requires: jq, yajl ( yum -y install jq yajl )
 iwserver="127.0.0.1";                             # IceWarp server IP/host
 ctimeout="600";                                   # curl connection timeout in seconds
-tmpFile="/root/tmpFile";
-tmpFolders="/root/tmpFolders";
-exportPath="/root/exporttst";
-importLogFile="/root/importLog";
+tmpFile="/opt/icewarp/scripts/tmpFile";
+tmpFolders="/opt/icewarp/scripts/tmpFolders";
+exportPath="/mnt/data/export/";
+importLogFile="/opt/icewarp/scripts/importLog";
+groupwareDatabase="smsfinance_grw"
 mkdir -p "${exportPath}"
 excludePattern='^"TeamChat';
 function rawurlencode # urlencode string function
@@ -72,31 +74,39 @@ curl --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webm
 # echo "${targetPath}";
 }
 
-function getFolders # ( 1: wcSid, 2: user@email -> gw folders list to tmpFile )
+# requires DB credentials in user's home folder in .my.cnf for passwordless mysql access
+function getFolders # ( 1: email -> writes gw folders list to tmpFolders, replaces getFolders2 and parseFolders2 )
 {
-wcSid="${1}";
-email="${2}";
-getfolder_request="<iq sid=\"wm-${wcSid}\" uid=\"${email}\" type=\"set\" format=\"json\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>";
-getfolder_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${getfolder_request}" "https://${iwserver}/webmail/server/webmail.php")";
-echo "${getfolder_response}" | json_reformat -u | jq . -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]|\"ATTRIBUTES\":\{\"UID\":\"[[:alnum:]\/\@_]*\"\}\}' | tr -d '[]{}' | sed -r 's|"VALUE":||' | sed -r 's|"UID":||' > "${tmpFile}"
+email="${1}"
+echo -e "select FDR_ID, FDRType from folders where FDRGRP_ID in (select grp_id from eventgroup where grpown_id in ( select OWN_ID from eventowner where OWN_Email = \x27${email}\x27) and GrpTitle = '') and FDRType <> 'M';" | mysql ${groupwareDatabase} | grep -v FDR_ID | awk '{print "\x22"$1"\x22;\x22"$2"\x22;"}' >> "${tmpFolders}"
 }
 
-function parseFolders # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
-{
-local wantType=0;
-while IFS=':' read attr value; do
-    if [[ ${attr} =~ '"TYPE"' ]]
-      then
-      folderType=${value}
-    fi
-    if [[ ( ${attr} =~ '"RELATIVE_PATH"' ) && ( ( ${folderType} =~ '"E"' ) || ( ${folderType} =~ '"C"' ) || ( ${folderType} =~ '"T"' ) ) ]]
-      then
-      local folderName="${value}";
-      folderRecord="${folderName};${folderType};";
-      echo "${folderRecord}" >> ${tmpFolders}
-    fi
-done < "${tmpFile}"
-}
+# replaced with getFolders ^
+#function getFolders2 # ( 1: wcSid, 2: user@email -> gw folders list to tmpFile )
+#{
+#wcSid="${1}";
+#email="${2}";
+#getfolder_request="<iq sid=\"wm-${wcSid}\" uid=\"${email}\" type=\"set\" format=\"json\"><query xmlns=\"webmail:iq:accounts\"><account action=\"refresh\" uid=\"${email}\"/></query></iq>";
+#getfolder_response="$(curl --connect-timeout ${ctimeout} -m ${ctimeout} -kL --data-binary "${getfolder_request}" "https://${iwserver}/webmail/server/webmail.php")";
+#echo "${getfolder_response}" | json_reformat -u | jq . -c | egrep -o '\"TYPE\":\[\{\"VALUE\":\"[[:alnum:]]\"\}\]|\"RELATIVE_PATH\":\[\{\"VALUE\":\"[[:alnum:]\\ \/]*\"\}\]|\"ATTRIBUTES\":\{\"UID\":\"[[:alnum:]\/\@_]*\"\}\}' | tr -d '[]{}' | sed -r 's|"VALUE":||' | sed -r 's|"UID":||' > "${tmpFile}"
+#}
+#
+#function parseFolders2 # ( tmpFile folder list from getFolders -> folder_name;type to tmpFolders file )
+#{
+#local wantType=0;
+#while IFS=':' read attr value; do
+#    if [[ ${attr} =~ '"TYPE"' ]]
+#      then
+#      folderType=${value}
+#    fi
+#    if [[ ( ${attr} =~ '"RELATIVE_PATH"' ) && ( ( ${folderType} =~ '"E"' ) || ( ${folderType} =~ '"C"' ) || ( ${folderType} =~ '"T"' ) ) ]]
+#      then
+#      local folderName="${value}";
+#      folderRecord="${folderName};${folderType};";
+#      echo "${folderRecord}" >> ${tmpFolders}
+#    fi
+#done < "${tmpFile}"
+#}
 
 # main
 rm -f ${tmpFile}
@@ -104,8 +114,8 @@ rm -f ${tmpFolders}
 echo "--- Logging user ${1} ---"
 wcSid="$(sessionLogin "${1}" "${2}")";
 echo "--- Exporting folders for ${1} ---"
-getFolders "${wcSid}" "${1}";
-parseFolders
+getFolders "${1}";
+#parseFolders
 echo "--- Exported folders for ${1}: ---"
 cat ${tmpFolders}
 mkdir -p "${exportPath}/${1}";
@@ -117,11 +127,20 @@ while IFS=';' read name type; do
     mkdir -p "${exportPath}/${1}/${makeDir}";
   fi
   case ${type} in
+   # Events ( calendar ) to ics
    '"E"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics"; folderPath="${exportPath}/${1}/${folderName}.ics";
    ;;
+   # Contacts to vcf
    '"C"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.vcf"; folderPath="${exportPath}/${1}/${folderName}.vcf";
    ;;
+   # Tasks to ics
    '"T"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics"; folderPath="${exportPath}/${1}/${folderName}.ics";
+   ;;
+   # Files ( documents ) to zip ( v2 )
+   '"F"') exportFolderVCF "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.zip"; folderPath="${exportPath}/${1}/${folderName}.zip";
+   ;;
+   # Journals to ics
+   '"J"') exportFolderICS "${wcSid}" "${1}" "${folderName}" "${exportPath}/${1}/${folderName}.ics"; folderPath="${exportPath}/${1}/${folderName}.ics";
    ;;
   esac
   echo "${1};;${2};;${type};;${folderName};;${folderPath};;" >> "${importLogFile}"
