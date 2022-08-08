@@ -35,6 +35,7 @@ admin="admin@domain.loc";
 adminpass="adminpassword";
 email="${1}";
 imapLogin="$(echo -ne "${email}\0${admin}\0${adminpass}" | base64 | tr -d '\n')";
+dryrun=1;
 
 function wctoken() # ( user@email -> auth wc URL for the user )
 {
