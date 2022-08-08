@@ -19,22 +19,53 @@ icewarpdSh="/opt/icewarp/icewarpd.sh";
 tmpFile="$(mktemp /tmp/folderrepair.XXXXXXXXX)";
 iwArchivePattern='^"Archive';
 indexFileName="imapindex.bin";
-backupPrefixPath=".zfs/snapshot/20200522-0024";
+backupPrefixPath=".zfs/snapshot/20220808-0000";
 mntPrefixPath="/mnt/data";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
 wcCacheRetry=100;
-excludePattern='^"~|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
+excludePattern='^"~|^"Soubory|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
 pubFolderPattern=' \\Public| \\Virtual| \\Shared| \\Noselect';
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
 logFailed="/root/logFailed_fix";
 dbgLvl=1;
 resetInbox=0;
+admin="admin@domain.loc";
+adminpass="adminpassword";
+email="${1}";
+imapLogin="$(echo -ne "${email}\0${admin}\0${adminpass}" | base64 | tr -d '\n')";
 
-function imapFolderList # ( 1: login email, 2: password -> imap folders list ) get user imap folders
+function wctoken() # ( user@email -> auth wc URL for the user )
 {
-local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". login \"${1}\" \"${2}\"\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v "${pubFolderPattern}" | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
+local start=`date +%s%N | cut -b1-13`
+local email="${1}";
+# get admin auth token
+local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>authenticate</commandname><commandparams><email>${admin}</email><password>${adminpass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
+local wcatoken="$(curl -s --connect-timeout 8 -m 8 -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o 'sid="(.*)"' | sed -r 's|sid="(.*)"|\1|')"
+if [ -z "${wcatoken}" ];
+  then
+    echo "ERROR" "Webclient Stage 1 fail - Error getting webclient auth token from control!";
+    return 1;
+fi
+# impersonate webclient user
+local imp_request="<iq sid=\"${wcatoken}\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>impersonatewebclient</commandname><commandparams><email>${email}</email></commandparams></query></iq>"
+local wclogintmp="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${imp_request}" "https://${iwserver}/icewarpapi/" | egrep -o '<result>(.*)</result>' | sed -r 's|<result>(.*)</result>|\1|')"
+wclogin="$(echo ${wclogintmp} | awk -F'=' '{print $2}')";
+if [ -z "${wclogin}" ];
+  then
+  local freturn="FAIL";echo "FAIL"
+  echo "ERROR" "Webclient Stage 2 fail - Error impersonating webclient user!";
+  return 1;
+  else
+  echo "${wclogin}"
+  return 0;
+fi
+}
+
+function imapFolderList # ( 1: login email -> imap folders list ) get user imap folders
+{
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". AUTHENTICATE PLAIN\n${imapLogin}\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v "${pubFolderPattern}" | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
   echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult} Could not auth.";return 1;
@@ -103,7 +134,7 @@ if [[ ! -d "${fmPath}" ]] ; then
 fi
 # get number of messages in given imap folder in EXISTS SELECT response
 imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
-local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. logout\n"
+local imapCmd=". AUTHENTICATE PLAIN\n${imapLogin}\n. select \"${imapFolder}\"\n. logout\n"
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep -o "\* (.*) EXISTS" | awk '{print $2}')"
 # test imap returned integer in number of messages in folder test, if not, plan index restore
 if ! [[ $cmdResult =~ $re ]] ; then
@@ -122,7 +153,7 @@ function getImapSeenCnt # ( 1: login email, 2: password, 3: imap folder path -> 
 {
 # get number of messages in given imap folder in UID SEARCH seen response
 imapFolder="$(echo "${3}" | tr -dc [:print:] |sed -r 's|"||g')";
-local imapCmd=". login ${1} ${2}\n. select \"${imapFolder}\"\n. uid search seen\n. logout\n"
+local imapCmd=". AUTHENTICATE PLAIN\n${imapLogin}\n. select \"${imapFolder}\"\n. uid search seen\n. logout\n"
 local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e "${imapCmd}" | nc -w ${ctimeout} 127.0.0.1 143 | egrep '\* SEARCH' | sed -r 's|\* SEARCH ||' | wc -w)"
 if ! [[ $cmdResult =~ $re ]] ; then
     echo "${fmPath}";return 1;
@@ -223,14 +254,9 @@ local tmpFolder="$(echo "${3}" | sed -r 's# #|#g')";
 local folderEncName="$(echo "${tmpFolder}" | sed -r 's|"||g')";
 local folderName="$(python imapcode.py "$(echo "${folderEncName}" | sed -r s'#\|# #g')")";
 local email="${1}";
-local pass="${2}";
-# get auth token
-local atoken_request="<iq uid=\"1\" format=\"text/xml\"><query xmlns=\"admin:iq:rpc\" ><commandname>getauthtoken</commandname><commandparams><email>${email}</email><password>${pass}</password><digest></digest><authtype>0</authtype><persistentlogin>0</persistentlogin></commandparams></query></iq>"
-local wcatoken="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL --data-binary "${atoken_request}" "https://${iwserver}/icewarpapi/" | egrep -o "<authtoken>(.*)</authtoken>" | sed -r s'|<authtoken>(.*)</authtoken>|\1|')"
-if [[ "${wcatoken}" =~ "500 Internal Server Error" ]] ; then echo "${wcatoken}";return 1; fi
- ## echo "1: ${wcatoken}"
+wcatoken="$(wctoken "${email}")";
 # get phpsessid
-local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=$( rawurlencode "${wcatoken}" )" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
+local wcphpsessid="$(curl -s --connect-timeout ${ctimeout} -m ${ctimeout} -ikL "https://${iwserver}/webmail/?atoken=${wcatoken}" | egrep -o "PHPSESSID_LOGIN=(.*); path=" | sed -r 's|PHPSESSID_LOGIN=wm(.*)\; path=|\1|' | head -1 | tr -d '\n')"
 if [[ "${wcphpsessid}" =~ "500 Internal Server Error" ]] ; then echo "${wcphpsessid}";return 1; fi
  ## echo "2: ${wcphpsessid}"
 # auth wc session
@@ -288,15 +314,15 @@ cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /ro
 function indexFix # ( 1: user@email ) stop imap, rename restored idx, backup original ones, restart imap
 {
 ${toolSh} set system C_System_Tools_WatchDog_POP3 0
-${icewarpdSh} --stop pop3
+sudo ${icewarpdSh} --stop pop3
 sleep 1
-${icewarpdSh} --stop pop3
+sudo ${icewarpdSh} --stop pop3
 pkill -9 -f pop3
 for I in $(cat "${tmpFile}")
 do
   indexRename "${I}"
 done
-${icewarpdSh} --restart pop3
+sudo ${icewarpdSh} --restart pop3
 ${toolSh} set system C_System_Tools_WatchDog_POP3 1
 ${toolSh} set account "${1}" u_directorycache_refreshnow 1
 }
@@ -304,12 +330,12 @@ ${toolSh} set account "${1}" u_directorycache_refreshnow 1
 function indexFolderFix # ( 1: user@email. 2: full fs folder path ) stop imap, rename restored idx, backup original ones, restart imap
 {
 ${toolSh} set system C_System_Tools_WatchDog_POP3 0
-${icewarpdSh} --stop pop3
+sudo ${icewarpdSh} --stop pop3
 sleep 1
-${icewarpdSh} --stop pop3
+sudo ${icewarpdSh} --stop pop3
 pkill -9 -f pop3
 indexRename "${2}"
-${icewarpdSh} --restart pop3
+sudo ${icewarpdSh} --restart pop3
 ${toolSh} set system C_System_Tools_WatchDog_POP3 1
 ${toolSh} set account "${1}" u_directorycache_refreshnow 1
 }
@@ -326,8 +352,9 @@ wget https://raw.githubusercontent.com/milamber86/scripts/master/imapcode.py
 wget https://raw.githubusercontent.com/milamber86/scripts/master/cache_invalidate.php
 chmod u+x imapcode.py
 fi
-echo "$(date) - ${1} start.";
-cmdResult=$(imapFolderList "${1}" "${2}"); # get imap folder list
+echo "$(date) - ${email} start.";
+imapFolders="";
+cmdResult=$(imapFolderList "${email}" "${2}"); # get imap folder list
 if [[ ${?} -ne 0 ]] ; then
   echo "${cmdResult}";exit 1;
     else
@@ -335,75 +362,75 @@ if [[ ${?} -ne 0 ]] ; then
 fi
 for i in "${imapFolders[@]}" # loop through folders in folder list, test fs vs imap count
 do
-  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+  cmdResult=$(testImapFolder "${email}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-    echo "+++ FAIL IMAP - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
-    prepFolderRestore "${1}" "${cmdResult}"
+    echo "+++ FAIL IMAP - User: ${email}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
+    if [[ ${dryrun} -eq 0 ]]; then prepFolderRestore "${email}" "${cmdResult}"; fi
       else
-      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${1}, ${cmdResult} msgs, folder: ${i}." ; fi ;
+      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${email}, ${cmdResult} msgs, folder: ${i}." ; fi ;
   fi
 done
-if [[ -s "${tmpFile}" ]] ; then
-  indexFix "${1}";
+if [[ ( -s "${tmpFile}" ) && ${dryrun} -eq 0 ]] ; then
+  indexFix "${email}";
 fi
 if [[ $resetInbox -eq 1 ]] ; then
-  fmPath="$(imapFolderFsPath "${1}" "INBOX")";
-  imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "INBOX");
+  fmPath="$(imapFolderFsPath "${email}" "INBOX")";
+  imapSeenCnt=$(getImapSeenCnt "${email}" "${2}" "INBOX");
   echo "INBOX index reset. Pre seen count: ${imapSeenCnt}";
-  prepFolderRestore "${1}" "${fmPath}";
-  indexFolderFix "${1}" "${fmPath}";
-  imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "INBOX");
+  prepFolderRestore "${email}" "${fmPath}";
+  indexFolderFix "${email}" "${fmPath}";
+  imapSeenCnt=$(getImapSeenCnt "${email}" "${2}" "INBOX");
   echo "INBOX index reset. Post seen count: ${imapSeenCnt}";
 fi
-refreshWcFolder "${1}" "${2}" "INBOX"; > /dev/null 2>&1
-cmdResult="$(testWcFolder "${1}" "INBOX")";
-if [[ $? -ne 0 ]] ; then resetWcUser "${1}"; fi
+refreshWcFolder "${email}" "${2}" "INBOX"; > /dev/null 2>&1
+cmdResult="$(testWcFolder "${email}" "INBOX")";
+if [[ ( $? -ne 0 ) && ( ${dryrun} -eq 0 ) ]] ; then resetWcUser "${email}"; fi
 for i in "${imapFolders[@]}"
 do
-  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+  cmdResult=$(testImapFolder "${email}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-  echo "+++ FAIL IMAP 2nd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
-  /usr/bin/rm -fv "${cmdResult}${indexFileName}";
-  cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${cmdResult}${indexFileName}");
-  /usr/bin/rm -fv "${cmdResult}flags.dat";
-  /usr/bin/rm -fv "${cmdResult}*.timestamp";
-  echo "*" > "${cmdResult}flagsext.dat";
-  chown icewarp:icewarp "${cmdResult}flagsext.dat";
-  ${icewarpdSh} --restart pop3
-  ${toolSh} set account "${1}" u_directorycache_refreshnow 1
-  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
-  cmdResult=$(testImapFolder "${1}" "${2}" "${i}");
+  echo "+++ FAIL IMAP 2nd time - User: ${email}, folder: ${i}, fullpath: ${cmdResult}. Deleting index, Triggering cache refresh."
+  if [[ ${dryrun} -eq 0 ]]; then /usr/bin/rm -fv "${cmdResult}${indexFileName}"; fi
+  if [[ ${dryrun} -eq 0 ]]; then cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${cmdResult}${indexFileName}"); fi
+  if [[ ${dryrun} -eq 0 ]]; then /usr/bin/rm -fv "${cmdResult}flags.dat"; fi
+  if [[ ${dryrun} -eq 0 ]]; then /usr/bin/rm -fv "${cmdResult}*.timestamp"; fi
+  if [[ ${dryrun} -eq 0 ]]; then echo "*" > "${cmdResult}flagsext.dat"; fi
+  if [[ ${dryrun} -eq 0 ]]; then chown icewarp:icewarp "${cmdResult}flagsext.dat"; fi
+  if [[ ${dryrun} -eq 0 ]]; then sudo ${icewarpdSh} --restart pop3; fi
+  if [[ ${dryrun} -eq 0 ]]; then ${toolSh} set account "${email}" u_directorycache_refreshnow 1; fi
+  if [[ ${dryrun} -eq 0 ]]; then cmdResult=$(testImapFolder "${email}" "${2}" "${i}"); fi
+  cmdResult=$(testImapFolder "${email}" "${2}" "${i}");
     if [[ ${?} -ne 0 ]] ; then
-    echo "+++ FAIL IMAP 3rd time - User: ${1}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
-    echo "${1};${cmdResult};" >> "${logFailed}"
+    echo "+++ FAIL IMAP 3rd time - User: ${email}, folder: ${i}, fullpath: ${cmdResult}. Logging, giving up."
+    echo "${email};${cmdResult};" >> "${logFailed}"
     fi
           else
           imapCnt=${cmdResult};
-          imapSeenCnt=$(getImapSeenCnt "${1}" "${2}" "${i}");
-          cmdResult="$(testWcFolder "${1}" "${i}")";
-          if [[ $? -ne 0 ]] ; then resetWcFolder "${1}" "${i}"; fi
+          imapSeenCnt=$(getImapSeenCnt "${email}" "${2}" "${i}");
+          cmdResult="$(testWcFolder "${email}" "${i}")";
+          if [[ ( $? -ne 0) && ( ${dryrun} -eq 0 ) ]] ; then resetWcFolder "${email}" "${i}"; fi
           if [[ ${cmdResult} -ne ${imapCnt} ]] ; then
-          echo "+++ FAIL WebC - User: ${1}, folder: ${i}, wc cache / imap / imap seen: ${cmdResult} / ${imapCnt} / ${imapSeenCnt} msgs.";
+          echo "+++ FAIL WebC - User: ${email}, folder: ${i}, wc cache / imap / imap seen: ${cmdResult} / ${imapCnt} / ${imapSeenCnt} msgs.";
           for j in $(seq 1 $wcCacheRetry);
             do
-            fixWcFolder "${1}" "${i}";
-            refreshWcFolder "${1}" "${2}" "${i}";
-            if [[ $? -ne 0 ]] ; then echo "FAIL WebC 2nd time - User: ${1}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
-            cmdResult=$(testWcFolder "${1}" "${i}");
+            if [[ ${dryrun} -eq 0 ]]; then fixWcFolder "${email}" "${i}"; fi
+            refreshWcFolder "${email}" "${2}" "${i}";
+            if [[ $? -ne 0 ]] ; then echo "FAIL WebC 2nd time - User: ${email}, folder: ${i}, Internal server error refreshfolder wc. Giving up.";break; fi
+            cmdResult=$(testWcFolder "${email}" "${i}");
             if [[ $j -ge 2 ]] ; then
-              overwrite "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+              overwrite "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${email}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
                 else
-                echo "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${1}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
+                echo "***** Update cycle ${j} / ${wcCacheRetry} ( interval 15s ) - User: ${email}, folder: ${i}, wc cache have: ${cmdResult} of ${imapCnt} msgs.";
             fi
             if [[ $cmdResult -eq ${imapCnt} ]] ; then break ; fi
             sleep 15;
             done
                       else
-                      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK WEBC - User: ${1}, imap: ${imapCnt}, imap seen: ${imapSeenCnt}, web: ${cmdResult} msgs, folder: ${i}." ; fi
+                      if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK WEBC - User: ${email}, imap: ${imapCnt}, imap seen: ${imapSeenCnt}, web: ${cmdResult} msgs, folder: ${i}." ; fi
                       continue;
           fi
    fi
 done
 rm -f "${tmpFile}";
-echo "$(date) - ${1} end.";
+echo "$(date) - ${email} end.";
 exit 0
