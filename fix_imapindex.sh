@@ -306,10 +306,10 @@ local bckName="${1}${bckPrefix}${indexFileName}";
 echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
 /usr/bin/mv -v "${dstName}" "${bckName}" && /usr/bin/mv -v "${srcName}" "${dstName}";
 chown icewarp:icewarp "${dstName}"
-cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${dstName}");
+cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${dstName}");
 echo "*" > "${1}flagsext.dat";
 chown icewarp:icewarp "${1}flagsext.dat";
-cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f /root/cache_invalidate.php "${1}flagsext.dat}");
+cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${1}flagsext.dat}");
 }
 
 function indexFix # ( 1: user@email ) stop imap, rename restored idx, backup original ones, restart imap
