@@ -19,23 +19,24 @@ icewarpdSh="/opt/icewarp/icewarpd.sh";
 tmpFile="$(mktemp /tmp/folderrepair.XXXXXXXXX)";
 iwArchivePattern='^"Archive';
 indexFileName="imapindex.bin";
-backupPrefixPath=".zfs/snapshot/20220808-0000";
+backupPrefixPath=".zfs/snapshot/20220806-0000";
 mntPrefixPath="/mnt/data";
 tmpPrefix="_restore_";
 bckPrefix="_backup_${myDate}_";
 wcCacheRetry=100;
-excludePattern='^"~|^"Soubory|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS';
-pubFolderPattern=' \\Public| \\Virtual| \\Shared| \\Noselect';
+includePattern=""; # only include these folders, | separated
+excludePattern='^"~|^"Soubory|^"Public Folders|^"Archive|"Notes|^Informa&AQ0-n&AO0- kan&AOE-ly RSS'; # exclude these folders
+pubFolderPattern=' \\Public| \\Virtual| \\Shared| \\Noselect'; # exclude these folders
 re='^[0-9]+$'; # "number" regex for results comparison
 dbName="$(cat /opt/icewarp/config/_webmail/server.xml | egrep -o "dbname=.*<" | sed -r 's|dbname=(.*)<|\1|')";
-logFailed="/root/logFailed_fix";
+logFailed="logFailed_fix";
 dbgLvl=1;
-resetInbox=0;
+resetInbox=0; # INBOX imap index will be always reset no matter the comparison of message numbers ( imap flags restore )
 admin="admin@domain.loc";
 adminpass="adminpassword";
 email="${1}";
 imapLogin="$(echo -ne "${email}\0${admin}\0${adminpass}" | base64 | tr -d '\n')";
-dryrun=1;
+dryrun=1; # only compare, do not make any changes
 
 function wctoken() # ( user@email -> auth wc URL for the user )
 {
@@ -66,7 +67,7 @@ fi
 
 function imapFolderList # ( 1: login email -> imap folders list ) get user imap folders
 {
-local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". AUTHENTICATE PLAIN\n${imapLogin}\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v "${pubFolderPattern}" | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}")"
+local cmdResult="$(timeout -k ${ctimeout} ${ctimeout} echo -e ". AUTHENTICATE PLAIN\n${imapLogin}\n. xlist \"\" \"*\"\n. logout\n" | nc -w 30 127.0.0.1 143 | egrep XLIST | egrep -v "${pubFolderPattern}" | egrep -o '\"(.*?)\"|Completed' | sed -r 's|"/" ||' | egrep -v "${excludePattern}" | egrep "${includePattern}")"
 echo "${cmdResult}" | tail -1 | egrep "Completed" > /dev/null
 if [[ ${?} -ne 0 ]] ; then
   echo "Failed getting list of imap folders for account ${1}. Error: ${cmdResult} Could not auth.";return 1;
@@ -291,7 +292,12 @@ local srcPath="${mntPrefixPath}/${backupPrefixPath}${iwmPath}";
 if [[ (-f "${dstPath}${indexFileName}") && (-f "${srcPath}${indexFileName}") ]]; then
 echo "Restoring ${indexFileName}, src: ${srcPath}${indexFileName} -> dst: ${dstPath}${tmpPrefix}${indexFileName}"
 /usr/bin/cp -fv "${srcPath}${indexFileName}" "${dstPath}/${tmpPrefix}${indexFileName}"
-#echo "${dstPath}" >> "${tmpFile}"
+#/usr/bin/cp -fv "${srcPath}flags.dat" "${dstPath}/${tmpPrefix}flags.dat"
+#/usr/bin/cp -fv "${srcPath}imapexpunged.dat" "${dstPath}/${tmpPrefix}imapexpunged.dat"
+#/usr/bin/cp -fv "${srcPath}imapindex.dat" "${dstPath}/${tmpPrefix}imapindex.dat"
+#rm -fv "${dstPath}/flags.dat"
+#/usr/bin/cp -fv "${srcPath}imapindex.bin" "${dstPath}/${tmpPrefix}imapindex.bin"
+echo "${dstPath}" >> "${tmpFile}"
   else
   echo "Error copying files, either src: ${srcPath}${indexFileName} or dst: ${dstPath}${indexFileName} does not exist."
   return 1
@@ -300,16 +306,19 @@ fi
 
 function indexRename # ( 1: full path to folder ) rename indexes , called from indexFix
 {
-local srcName="${1}${tmpPrefix}${indexFileName}";
-local dstName="${1}${indexFileName}";
-local bckName="${1}${bckPrefix}${indexFileName}";
-echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
-/usr/bin/mv -v "${dstName}" "${bckName}" && /usr/bin/mv -v "${srcName}" "${dstName}";
-chown icewarp:icewarp "${dstName}"
-cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${dstName}");
-echo "*" > "${1}flagsext.dat";
-chown icewarp:icewarp "${1}flagsext.dat";
-cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${1}flagsext.dat}");
+for indexFileName in imapindex.bin;
+  do
+    local srcName="${1}${tmpPrefix}${indexFileName}";
+    local dstName="${1}${indexFileName}";
+    local bckName="${1}${bckPrefix}${indexFileName}";
+    echo "Moving ${dstName} -> ${bckName} and ${srcName} -> ${dstName}";
+    /usr/bin/mv -v "${dstName}" "${bckName}" && /usr/bin/mv -v "${srcName}" "${dstName}";
+    chown icewarp:icewarp "${dstName}"
+    cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${dstName}");
+    echo "*" > "${1}flagsext.dat";
+    chown icewarp:icewarp "${1}flagsext.dat";
+    cacheInvalidate=$(/opt/icewarp/scripts/php.sh -c /opt/icewarp/php/php.ini -f cache_invalidate.php "${1}flagsext.dat}");
+  done
 }
 
 function indexFix # ( 1: user@email ) stop imap, rename restored idx, backup original ones, restart imap
@@ -365,7 +374,7 @@ for i in "${imapFolders[@]}" # loop through folders in folder list, test fs vs i
 do
   cmdResult=$(testImapFolder "${email}" "${2}" "${i}");
   if [[ ${?} -ne 0 ]] ; then
-    echo "+++ FAIL IMAP - User: ${email}, folder: ${i}, fullpath: ${cmdResult}. Trying to repair."
+    echo -e "+++ FAIL IMAP - User: ${email}, folder: ${i}, fullpath: ${cmdResult}."; if [[ ${dryrun} -eq 0 ]]; then echo "Trying to repair."; fi
     if [[ ${dryrun} -eq 0 ]]; then prepFolderRestore "${email}" "${cmdResult}"; fi
       else
       if [[ $dbgLvl -eq 1 ]] ; then echo "*** OK IMAP - User: ${email}, ${cmdResult} msgs, folder: ${i}." ; fi ;
