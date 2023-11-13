@@ -5,12 +5,13 @@ cfgExportFile=/root/cfgexport.cf
 iwtool="$iw_install_dir/tool.sh"
 
 mv -fv "${cfgExportFile}" "${cfgExportFile}_bak.$(date)"
-test="$(head -1 $iw_install_dir/path.dat)";
-if [[ ! -z "${test}" ]]
-  then
-    config_path="$(echo -n ${test} | tr -d '\r')";
-  else
-    config_path="$iw_install_dir/config";
+if [[ -f "$iw_install_dir/path.dat" ]]; then
+    test="$(head -1 $iw_install_dir/path.dat)";
+    if [[ ! -z "${test}" ]]; then
+        config_path="$(echo -n ${test} | tr -d '\r')";
+       else
+        config_path="$iw_install_dir/config";
+    fi
 fi
 
 orderId="$(${iwtool} get system C_License | egrep -o "<header><purchaseid>(.*)</purchaseid>" | sed -r 's|<header><purchaseid>(.*)</purchaseid>|\1|')"
