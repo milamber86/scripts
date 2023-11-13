@@ -12,6 +12,8 @@ if [[ -f "$iw_install_dir/path.dat" ]]; then
        else
         config_path="$iw_install_dir/config";
     fi
+else
+    config_path="$iw_install_dir/config";
 fi
 
 orderId="$(${iwtool} get system C_License | egrep -o "<header><purchaseid>(.*)</purchaseid>" | sed -r 's|<header><purchaseid>(.*)</purchaseid>|\1|')"
