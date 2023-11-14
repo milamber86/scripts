@@ -6,7 +6,7 @@ iwtool="$iw_install_dir/tool.sh"
 
 mv -fv "${cfgExportFile}" "${cfgExportFile}_bak.$(date)"
 if [[ -f "$iw_install_dir/path.dat" ]]; then
-    test="$(head -1 $iw_install_dir/path.dat)";
+    test="$(head -1 $iw_install_dir/path.dat | strings)";
     if [[ ! -z "${test}" ]]; then
         config_path="$(echo -n ${test} | tr -d '\r')";
        else
