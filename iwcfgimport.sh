@@ -20,7 +20,7 @@ echo "${ret} - ${prop} : ${val}";
 
 for I in orderId superPass gwSuperPass accStorageMode mailPath archivePath tempPath logsPath accDbConn dcDbConn gwDbConn asDbConn easDbConn easDbUser easDbPass;
   do
-    val="$(egrep "${I}" "${cfgImportFile}" | awk '{print $2}')";
+    val="$(egrep "^${I}" "${cfgImportFile}" | awk '{print $2}')";
     case "${I}" in
       orderId) echo "Activate using /opt/icewarp/wizard.sh using OrderID: "${val}""
       ;;
