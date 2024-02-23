@@ -1,7 +1,7 @@
 #!/bin/bash
 cfgImportFile=/root/cfgexport.cf
 iw_install_dir=$(cat /etc/icewarp/icewarp.conf | awk -F "\"" '/^IWS_INSTALL_DIR=/ {print $2}')
-test="$(head -1 $iw_install_dir/path.dat)";
+test="$(head -1 $iw_install_dir/path.dat | tr -dc [:print:])";
 if [[ ! -z "${test}" ]]
   then
     config_path="$(echo -n ${test} | tr -d '\r')";
